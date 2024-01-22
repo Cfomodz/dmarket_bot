@@ -213,7 +213,7 @@ class DMarketApi:
         method = 'GET'
         url_path = '/marketplace-api/v1/user-targets'
         params = {'BasicFilters.Status': status, 'GameId': game.value, 'BasicFilters.Currency': currency,
-                'Limit': limit}
+                'Limit': limit, 'SortType': 'UserTargetsSortTypeDefault'}
         if price_from:
             params['BasicFilters.PriceFrom'] = price_from
         if price_to:
@@ -227,6 +227,8 @@ class DMarketApi:
         headers = self.generate_headers(method, url_path, params)
         url = API_URL + url_path
         response = await self.api_call(url, method, headers, params)
+        logger.debug(f"user_targets() count: {len(response['Items'])}")
+        logger.debug(f"{response['Items'][0].items()}")
         return UserTargets(**response)
 
     async def closed_targets(self, limit: str = '100', order_dir: str = 'desc') -> ClosedTargets:
@@ -295,6 +297,7 @@ class DMarketApi:
         headers = self.generate_headers(method, url_path, params)
         url = API_URL + url_path
         response = await self.api_call(url, method, headers, params=params)
+        # logger.debug(response)
         return MarketOffers(**response)
 
     async def user_offers(self, game: Games = Games.RUST, status: str = 'OfferStatusDefault',
@@ -328,17 +331,18 @@ class DMarketApi:
     async def user_offers_create(self, body: CreateOffers):
         method = 'POST'
         url_path = '/marketplace-api/v1/user-offers/create'
-
-        body = body.dict()
+        body = body.model_dump()
         headers = self.generate_headers(method, url_path, body=body)
+        logger.debug(f'user_offers_create() body: {body}')
         url = API_URL + url_path
         response = await self.api_call(url, method, headers, body=body)
+        logger.debug(f'user_offers_create() response: {response}')
         return CreateOffersResponse(**response)
 
     async def user_offers_edit(self, body: EditOffers):
         method = 'POST'
         url_path = '/marketplace-api/v1/user-offers/edit'
-        body = body.dict()
+        body = body.model_dump()
         headers = self.generate_headers(method, url_path, body=body)
         url = API_URL + url_path
         response = await self.api_call(url, method, headers, body=body)

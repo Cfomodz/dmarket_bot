@@ -13,9 +13,22 @@ db.close()
 class SelectSkin:
     @staticmethod
     def create_all_skins(items: List[SkinHistory]):
-        skins = [Skin(**i.dict()) for i in items]
-        with db.atomic():
-            Skin.bulk_create(skins, batch_size=500)
+        skins = []
+        for i in items:
+            print(f"item: {i}")
+            try:
+                skin = Skin(
+                    title = i.title,
+                    game = i.game,
+                    LastSales = i.sales, 
+                    avg_price = i.avg_price,
+                    update_time = i.update_time
+                )
+                print(f"skin data: {skin.__data__}")
+                skin.save()
+                skins.append(skin)
+            except Exception as e:
+                print(f"Failed to create skin from item {i}: {e}")
 
     @staticmethod
     def skin_existence(item: MarketOffer):
@@ -31,13 +44,13 @@ class SelectSkin:
         for item in items:
             try:
                 skin = Skin.get(Skin.title == item.title)
-                it = item.dict()
+                it = item.model_dump()
                 skin.avg_price = it['avg_price']
                 skin.LastSales = it['LastSales']
                 skin.update_time = it['update_time']
                 skins_to_update.append(skin)
             except DoesNotExist:
-                skin_to_create.append(Skin(**item.dict()))
+                skin_to_create.append(Skin(**item.model_dump()))
         with db.atomic():
             Skin.bulk_update(skins_to_update,
                             fields=[Skin.avg_price, Skin.LastSales, Skin.update_time],
@@ -48,13 +61,19 @@ class SelectSkin:
     @staticmethod
     def select_all() -> List[SkinHistory]:
         skins = Skin.select()
-        return [SkinHistory.from_orm(skin) for skin in skins]
+        for s in skins:
+            print(s.title)
+        # print(f"skins: {skins}")
+        return [SkinHistory(title=skin.title, game=skin.game, sales=skin.LastSales, LastSales=skin.LastSales, avg_price=skin.avg_price, update_time=skin.update_time) for skin in skins]
 
     @staticmethod
     def select_update_time(now, delta) -> List[SkinHistory]:
         skins = Skin.select().where(Skin.update_time < datetime.fromtimestamp(now - delta))
+        for s in skins:
+            print(s.title)
+        print(f"skins: {skins}")
         if skins:
-            return [SkinHistory.from_orm(skin) for skin in skins]
+            return [SkinHistory(title=skin.title, game=skin.game, sales=skin.LastSales, LastSales=skin.LastSales, avg_price=skin.avg_price, update_time=skin.update_time) for skin in skins]
         return []
 
 

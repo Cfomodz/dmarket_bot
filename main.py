@@ -32,11 +32,12 @@ async def orders_loop():
     while True:
         logger.debug(f'orders loop')
         try:
-            logger.debug(f'{bot.balance}')
+            logger.debug(f'Balance: {bot.balance}')
             if bot.balance > orders.order_list.min_price + BuyParams.STOP_ORDERS_BALANCE:
+                logger.debug(f'Balance is enough to place orders, calling update_orders()')
                 await orders.update_orders()
-                logger.debug(f'orders loop sleep')
-                await asyncio.sleep(5)
+                logger.debug(f"update_orders() finished, sleep for {Timers.ORDERS_BASE} seconds")
+                await asyncio.sleep(Timers.ORDERS_BASE)
             else:
                 targets = await orders.bot.user_targets(limit='1000')
                 targets_inactive = await orders.bot.user_targets(limit='1000', status='TargetStatusInactive')
@@ -99,10 +100,10 @@ async def main_loop():
     tasks = await asyncio.gather(
             bot.get_money_loop(),
             # delete_offers_loop(),
-            history_loop(),
-            # orders_loop(),
-            add_to_sell_loop(),
-            update_offers_loop(),
+            # history_loop(),
+            orders_loop(),
+            # add_to_sell_loop(),
+            # update_offers_loop(),
             create_pre_base(),
             return_exceptions=True
             )
