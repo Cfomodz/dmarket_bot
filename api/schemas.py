@@ -247,14 +247,9 @@ class DeleteOffers(BaseModel):
 class SkinHistory(LastSales):
     game: str
     title: str
+    sales: List[LastSale]
     avg_price: float
     update_time: datetime
-    class Config:
-        orm_mode = True
-        from_attributes = True
-
-    class Config:
-        orm_mode = True
 
 
 class SkinOrder(BaseModel):

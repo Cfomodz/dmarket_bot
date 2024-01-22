@@ -169,12 +169,14 @@ class OrderAnalytics:
                         items.append(SkinOrder(title=skin.title, bestOrder=int(best_target*100), game=skin.game))
         return items
 
-    async def skins_for_buy(self) -> List[SkinOrder]:
+    async def skins_to_buy(self) -> List[SkinOrder]:
         t = time()
         new_skins = list()
         skins = []
         for game in GAMES:
-            skins += [i for i in SelectSkin.select_all() if self.min_price < i.avg_price < self.max_price
+            all_skins = SelectSkin.select_all()
+            logger.debug(f'ALL SKINS {len(all_skins)}')
+            skins += [i for i in all_skins if self.min_price < i.avg_price < self.max_price
                     and i.game == game.value]
         logger.info(f'SKINS {len(skins)}')
         if skins:
@@ -251,15 +253,19 @@ class Orders:
 
     async def update_orders(self):
         t = time()
-        skins = await self.order_list.skins_for_buy()
+        logger.debug('Update orders')
+        skins = await self.order_list.skins_to_buy()
+        logger.debug(f'Skins to buy: {len(skins)}')
         targets = await self.bot.user_targets(limit='1000')
         name_group = [list(j) for _, j in groupby(targets.Items, key=lambda x: x.Title)]
         targets_inactive = await self.bot.user_targets(limit='1000', status='TargetStatusInactive')
+        logger.debug(f'Inactive {len(targets_inactive.Items)}')
         new, good, bad = self.sort_targets(skins, targets.Items)
         for name in name_group:
             if len(name) > 1:
                 bad += name[1:]
-        # await self.bot.delete_target(bad + targets_inactive.Items)
+        logger.debug(f'Bad {len(bad)}')
+        await self.bot.delete_target(bad + targets_inactive.Items)
         for skin in new:
             logger.write(f'{skin.market_hash_name} {skin.best_order} {skin.min_price} {skin.max_price}')
             if self.bot.balance > skin.bestOrder:

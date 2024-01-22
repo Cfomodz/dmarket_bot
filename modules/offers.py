@@ -104,6 +104,8 @@ class Offers:
                 if i.AssetID == j.AssetID:
                     price = j.buyPrice * (1 + self.max_percent / 100 + i.fee / 100)
                     i.sellPrice = price
+            if i.sellPrice is None or i.sellPrice < 0.05:
+                continue
             try:
                 create_offers.append(CreateOffer(AssetID=i.AssetID,
                                                 Price=LastPrice(Currency='USD', Amount=round(i.sellPrice, 2))))

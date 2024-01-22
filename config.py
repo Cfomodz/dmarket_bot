@@ -17,6 +17,7 @@ logger.configure(**logger_config)
 API_URL = "https://api.dmarket.com"
 API_URL_TRADING = API_URL
 # GAMES = [Games.CS, Games.DOTA, Games.RUST]
+# GAMES = [Games.RUST, Games.DOTA]
 GAMES = [Games.RUST]
 DATABASE_NAME = '/skins.db'
 
@@ -31,17 +32,17 @@ class Timers:
 
 class PrevParams:
     # POPULARITY = 3
-    MIN_AVG_PRICE = 92
-    MAX_AVG_PRICE = 93
+    MIN_AVG_PRICE = 16
+    MAX_AVG_PRICE = 17
 
 
 class BuyParams:
-    STOP_ORDERS_BALANCE = 100
+    STOP_ORDERS_BALANCE = 500
     FREQUENCY = True
-    MIN_PRICE = 50
-    MAX_PRICE = 1250
+    MIN_PRICE = 90
+    MAX_PRICE = 225
 
-    PROFIT_PERCENT = 5
+    PROFIT_PERCENT = 15
     GOOD_POINTS_PERCENT = 30
     AVG_PRICE_COUNT = 7
 
