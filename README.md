@@ -1,5 +1,14 @@
+<div align="center">
+  
 # dmarket_bot
+![GitHub Sponsors](https://img.shields.io/github/sponsors/Cfomodz)
+![Discord](https://img.shields.io/discord/425182625032962049)
+
+<img src="https://github.com/user-attachments/assets/3c1f0f54-8ede-4d5d-9b4f-352f3b23da21" alt="dmarket bot icon" width="300"/>
+
 Bot for automatic trading on dmarket 
+
+</div>
 
 ## Quick Setup
 
