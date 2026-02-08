@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
-from typing import List, Union
-from pydantic import BaseModel
+from typing import List, Optional, Union
+from pydantic import BaseModel, ConfigDict
 
 
 class Games(enum.Enum):
@@ -29,33 +29,23 @@ class LastSales(BaseModel):
     sales: List[LastSale]
 
 
-class SaleHistory(BaseModel):
-    Prices: List[Union[int, str]]
-    Items: List[int]
-    Labels: List[datetime]
-
-
-class SalesHistory(BaseModel):
-    SalesHistory: SaleHistory
-
-
 class MarketOfferPrice(BaseModel):
-    DMC: Union[int, str]
-    USD: Union[int, str]
+    DMC: Union[int, str] = 0
+    USD: Union[int, str] = 0
 
 
 class MarketOfferExtra(BaseModel):
-    categoryPath: str = None
-    name: str = None
-    title: str = None
-    category: str = None
-    gameId: Games
-    groupId: int = None
-    tradeLock: int = None
-    rarity: str = None
-    exterior: str = None
-    type: str = None
-    stickers: list = None
+    categoryPath: Optional[str] = None
+    name: Optional[str] = None
+    title: Optional[str] = None
+    category: Optional[str] = None
+    gameId: Optional[Games] = None
+    groupId: Optional[int] = None
+    tradeLock: Optional[int] = None
+    rarity: Optional[str] = None
+    exterior: Optional[str] = None
+    type: Optional[str] = None
+    stickers: Optional[list] = None
 
 
 class MarketOffer(BaseModel):
@@ -78,28 +68,41 @@ class MarketOffer(BaseModel):
 
 
 class MarketOffers(BaseModel):
-    cursor: str = None
+    cursor: Optional[str] = None
     objects: List[MarketOffer]
 
 
-class AggregatedOffer(BaseModel):
-    BestPrice: float
-    Count: int
+# --- Aggregated Prices (POST /marketplace-api/v1/aggregated-prices) ---
+
+class AggregatedPriceFilter(BaseModel):
+    game: str
+    titles: List[str]
 
 
-class AggregatedTitle(BaseModel):
-    MarketHashName: str
-    Offers: AggregatedOffer
-    Orders: AggregatedOffer
+class AggregatedPricesRequest(BaseModel):
+    cursor: Optional[str] = None
+    limit: int = 100
+    filter: AggregatedPriceFilter
 
 
-class AggregatedPrices(BaseModel):
-    AggregatedTitles: List[AggregatedTitle]
+class AggregatedPrice(BaseModel):
+    title: str
+    orderBestPrice: Optional[float] = 0
+    orderCount: Optional[int] = 0
+    offerBestPrice: Optional[float] = 0
+    offerCount: Optional[int] = 0
 
+
+class AggregatedPricesResponse(BaseModel):
+    aggregatedPrices: List[AggregatedPrice]
+    nextCursor: Optional[str] = None
+
+
+# --- Targets (Buy Orders) ---
 
 class TargetAttributes(BaseModel):
-    Name: str = None
-    Value: str = None
+    Name: Optional[str] = None
+    Value: Optional[str] = None
 
 
 class Target(BaseModel):
@@ -108,7 +111,7 @@ class Target(BaseModel):
     Amount: str
     Status: str
     GameID: Games
-    GameType: str = None
+    GameType: Optional[str] = None
     Attributes: List[TargetAttributes]
     Price: LastPrice
 
@@ -135,17 +138,21 @@ class ClosedTargets(BaseModel):
 class CreateTarget(BaseModel):
     Amount: str
     Price: LastPrice
-    Attributes: List[TargetAttributes]
+    Title: str
+    Attrs: Optional[List[TargetAttributes]] = None
 
 
 class CreateTargets(BaseModel):
+    GameID: str
     Targets: List[CreateTarget]
 
+
+# --- User Items / Inventory ---
 
 class Offer(BaseModel):
     OfferID: str
     Price: LastPrice
-    Fee: LastPrice = None
+    Fee: Optional[LastPrice] = None
     CreatedDate: str
 
 
@@ -156,9 +163,10 @@ class ClosedOffer(BaseModel):
     Price: LastPrice
     Amount: int
     Title: str
-    Fee : dict
+    Fee: dict
     OfferCreatedAt: str
     OfferClosedAt: str
+
 
 class UserItem(BaseModel):
     AssetID: str
@@ -173,28 +181,24 @@ class UserItem(BaseModel):
     Tradable: bool
     Attributes: List[TargetAttributes]
     Offer: Offer
-    Fee: LastPrice = None
-    MarketPrice: LastPrice = None
+    Fee: Optional[LastPrice] = None
+    MarketPrice: Optional[LastPrice] = None
     ClassID: str
 
 
 class ClosedOffers(BaseModel):
     Trades: List[ClosedOffer]
     Total: str
-    Cursor: str = None
-
-
-class ClosedOffers(BaseModel):
-    Trades: List[ClosedOffer]
-    Total: str
-    Cursor: str = None
+    Cursor: Optional[str] = None
 
 
 class UserItems(BaseModel):
     Items: List[UserItem]
     Total: str
-    Cursor: str = None
+    Cursor: Optional[str] = None
 
+
+# --- Create / Edit / Delete Offers ---
 
 class CreateOffer(BaseModel):
     AssetID: str
@@ -244,6 +248,8 @@ class DeleteOffers(BaseModel):
     objects: List[DeleteOffer]
 
 
+# --- Internal bot models ---
+
 class SkinHistory(LastSales):
     game: str
     title: str
@@ -255,27 +261,27 @@ class SkinHistory(LastSales):
 class SkinOrder(BaseModel):
     title: str
     game: Games
-    bestOrder: int = None
-    maxPrice: int = None
-    minPrice: int = None
-    targetId: str = None
+    bestOrder: Optional[int] = None
+    maxPrice: Optional[int] = None
+    minPrice: Optional[int] = None
+    targetId: Optional[str] = None
 
 
 class SellOffer(BaseModel):
     AssetID: str
-    title: str = None
-    game: str = None
-    OfferID: str = None
-    sellTime: datetime = None
-    buyPrice: float = None
-    sellPrice: float = None
+    title: Optional[str] = None
+    game: Optional[str] = None
+    OfferID: Optional[str] = None
+    sellTime: Optional[datetime] = None
+    buyPrice: Optional[float] = None
+    sellPrice: Optional[float] = None
     buyTime: datetime = datetime.now()
     fee: int = 7
 
-    class Config:
-        from_attributes = True
-        
+    model_config = ConfigDict(from_attributes=True)
 
+
+# --- Cumulative Prices ---
 
 class CumulativePrice(BaseModel):
     Price: float
@@ -287,23 +293,3 @@ class CumulativePrices(BaseModel):
     Offers: List[CumulativePrice]
     Targets: List[CumulativePrice]
     UpdatedAt: int
-
-
-class OfferDetails(BaseModel):
-    items: List[str]
-
-
-class OfferDetailPrice(BaseModel):
-    amount: int
-    currency: str
-
-
-class OfferDetail(BaseModel):
-    itemId: str
-    steamMarketPrice: OfferDetailPrice
-    minListedPrice: OfferDetailPrice
-    offersOnMarketplace: int
-
-
-class OfferDetailsResponse(BaseModel):
-    objects: List[OfferDetail]
