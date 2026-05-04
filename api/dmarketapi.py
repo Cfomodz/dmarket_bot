@@ -3,7 +3,7 @@ import aiohttp
 import json
 from datetime import datetime
 from asyncio import CancelledError
-from typing import List
+from typing import List, Mapping
 from nacl.bindings import crypto_sign
 from furl import furl
 from config import API_URL, logger
@@ -48,7 +48,7 @@ class DMarketApi:
         return headers
 
     @staticmethod
-    def catch_exception(response_status: int, headers: dict, response_text: str):
+    def catch_exception(response_status: int, headers: Mapping[str, str], response_text: str):
         if response_status == 400:
             raise BadRequestError()
         if response_status in (500, 502):
@@ -61,7 +61,7 @@ class DMarketApi:
             raise WrongResponseException(response_text)
 
     async def validate_response(self, response: aiohttp.ClientResponse) -> dict:
-        headers = dict(response.headers)
+        headers = response.headers
         if 'RateLimit-Remaining' not in headers:
             await asyncio.sleep(5)
         if 'RateLimit-Remaining' in headers and headers['RateLimit-Remaining'] in ['1', '0']:
