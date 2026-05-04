@@ -44,3 +44,12 @@ class TestCheckName:
     def test_all_bad_items_filtered(self):
         for item in BAD_ITEMS:
             assert SkinBase.check_name(f'Test {item} Item') is False
+
+    def test_no_false_positive_key_in_monkey(self):
+        assert SkinBase.check_name('Monkey Business') is True
+
+    def test_no_false_positive_pin_in_pinstripe(self):
+        assert SkinBase.check_name('Emerald Pinstripe') is True
+
+    def test_no_false_positive_kit_in_toolkit(self):
+        assert SkinBase.check_name('Desert Eagle Toolkit') is True

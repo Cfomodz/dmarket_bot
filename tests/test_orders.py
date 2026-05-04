@@ -164,3 +164,32 @@ class TestOrders:
         result = await orders.create_order(SkinOrder(title='Test', game=Games.RUST, bestOrder=100))
         assert result == []
         mock_bot.create_target.assert_not_called()
+
+
+class TestFrequencySkins:
+    @pytest.mark.asyncio
+    async def test_frequency_skins_uses_skin_sales(self, mock_bot):
+        """frequency_skins should use skin.sales, not skin.LastSales."""
+        skin = make_skin_history(title='Test Skin', game='rust', avg_price=150, count=20)
+        agr = make_aggregated_price(title='Test Skin', order_best=1.40, offer_count=5)
+        mock_bot.aggregated_prices = AsyncMock(return_value=[agr])
+
+        analytics = OrderAnalytics(mock_bot)
+        result = await analytics.frequency_skins([skin])
+        # Should not raise AttributeError; result may be empty or contain items
+        assert isinstance(result, list)
+
+    @pytest.mark.asyncio
+    async def test_frequency2_uses_skin_sales(self, mock_bot):
+        """frequency2 should use skin.sales, not skin.LastSales."""
+        skin = make_skin_history(title='Test Skin', game='rust', avg_price=150, count=20)
+        mock_bot.cumulative_price = AsyncMock(return_value=CumulativePrices(
+            Offers=[CumulativePrice(Price=1.6, Level=1, Amount=3)],
+            Targets=[CumulativePrice(Price=1.4, Level=1, Amount=3)],
+            UpdatedAt=0,
+        ))
+
+        analytics = OrderAnalytics(mock_bot)
+        result = await analytics.frequency2([skin])
+        # Should not raise AttributeError; result may be empty or contain items
+        assert isinstance(result, list)

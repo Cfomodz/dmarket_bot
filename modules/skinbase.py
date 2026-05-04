@@ -1,4 +1,5 @@
 import datetime
+import re
 from itertools import groupby
 from time import time
 from pydantic import ValidationError
@@ -21,8 +22,9 @@ class SkinBase:
 
     @staticmethod
     def check_name(item_name: str):
-        for i in BAD_ITEMS:
-            if i in item_name.lower():
+        name_lower = item_name.lower()
+        for bad in BAD_ITEMS:
+            if re.search(r'\b' + re.escape(bad) + r'\b', name_lower):
                 return False
         return True
 

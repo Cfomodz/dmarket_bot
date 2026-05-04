@@ -123,9 +123,9 @@ class OrderAnalytics:
             my_sell_price = best_order * (1 + self.profit_percent / 100)
 
             count = 0
-            points_count = math.ceil(len(skin.LastSales) / 100 * self.good_points_percent)
-            for i in skin.LastSales:
-                price_with_fee = i.Price.Amount * (1 - SELL_FEE / 100)
+            points_count = math.ceil(len(skin.sales) / 100 * self.good_points_percent)
+            for i in skin.sales:
+                price_with_fee = sale_price_amount(i.price) * (1 - SELL_FEE / 100)
                 if price_with_fee > my_sell_price:
                     count += 1
             if count >= points_count:
@@ -174,11 +174,11 @@ class OrderAnalytics:
                 await self.analyze_market_offers(skin)
 
             if profit_2 > self.profit_percent and profit > self.profit_percent:
-                my_sell_price = best_target * (1 + self.profit_percent / 100)
+                my_sell_price = best_target * 100 * (1 + self.profit_percent / 100)
                 count = 0
-                points_count = math.ceil(len(skin.LastSales) / 100 * self.good_points_percent)
-                for i in skin.LastSales:
-                    price_with_fee = i.Price.Amount * (1 - SELL_FEE / 100)
+                points_count = math.ceil(len(skin.sales) / 100 * self.good_points_percent)
+                for i in skin.sales:
+                    price_with_fee = sale_price_amount(i.price) * (1 - SELL_FEE / 100)
                     if price_with_fee > my_sell_price:
                         count += 1
                 if count >= points_count:
