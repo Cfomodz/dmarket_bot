@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 from typing import List, Optional, Union
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Games(enum.Enum):
@@ -275,7 +275,7 @@ class SellOffer(BaseModel):
     sellTime: Optional[datetime] = None
     buyPrice: Optional[float] = None
     sellPrice: Optional[float] = None
-    buyTime: datetime = datetime.now()
+    buyTime: datetime = Field(default_factory=datetime.now)
     fee: int = 7
 
     model_config = ConfigDict(from_attributes=True)
