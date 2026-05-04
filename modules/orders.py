@@ -154,8 +154,8 @@ class OrderAnalytics:
 
     async def analyze_market_offers(self, skin: SkinHistory):
         market_info = await self.bot.cumulative_price(skin.title, skin.game)
-        len_avg = skin.LastSales[0:self.avg_price_count]
-        avg_price_10 = sum([s.Price.Amount / 100 for s in len_avg]) / len(len_avg)
+        len_avg = skin.sales[0:self.avg_price_count]
+        avg_price_10 = sum(float(s.price) for s in len_avg) / len(len_avg)
         best_offer, second_offer, offers_count = self.first_second_offer(market_info.Offers)
         best_target, second_target, targets_count = self.first_second_offer(market_info.Targets)
         if best_offer == 0 or (best_target - second_target) / best_offer * 100 > 3:
