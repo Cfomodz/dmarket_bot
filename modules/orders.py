@@ -7,11 +7,26 @@ from typing import List, Tuple
 from api.schemas import SkinHistory, SkinOrder, Target, CreateTarget, \
     CreateTargets, LastPrice, TargetAttributes, CumulativePrice
 import math
+import re
 from pyti.simple_moving_average import simple_moving_average as sma
 
 
+def sale_price_amount(price: str) -> float:
+    value = re.sub(r"[^\d.,-]", "", price or "").replace(",", ".")
+    if not value:
+        return 0.0
+    amount = float(value)
+    if "." in value:
+        return amount * 100
+    return amount
+
+
+def sale_timestamp(sale) -> int:
+    return int(sale.date.timestamp())
+
+
 def moving_average_5(history) -> list:
-    prices = [float(i.price) for i in history]
+    prices = [sale_price_amount(i.price) for i in history]
     prices.reverse()
     result = list(sma(prices, 5))
     result.reverse()
@@ -46,13 +61,15 @@ class OrderAnalytics:
     def popularity_control(self, skins: List[SkinHistory]) -> List[SkinHistory]:
         items = list()
         for skin in skins:
+            if not skin.sales:
+                continue
             sales = list()
-            first_sale = int(skin.LastSales[-1].Date.timestamp())
-            last_sale = int(skin.LastSales[0].Date.timestamp())
+            first_sale = sale_timestamp(skin.sales[-1])
+            last_sale = sale_timestamp(skin.sales[0])
             if first_sale < (time() - self.first_sale * 60 * 60 * 24):
                 if last_sale > (time() - self.last_sale * 60 * 60 * 24):
-                    for sale in skin.LastSales:
-                        if int(sale.Date.timestamp()) > (time() - self.days_count * 60 * 60 * 24):
+                    for sale in skin.sales:
+                        if sale_timestamp(sale) > (time() - self.days_count * 60 * 60 * 24):
                             sales.append(sale)
                     if len(sales) >= self.sale_count:
                         items.append(skin)
@@ -61,13 +78,13 @@ class OrderAnalytics:
     def boost_control(self, skins: List[SkinHistory]) -> List[SkinHistory]:
         new_skins = list()
         for item in skins:
-            mov_av = moving_average_5(item.LastSales)
+            mov_av = moving_average_5(item.sales)
             delete_points = 0
             try:
                 for i in range(len(mov_av[:-4])):
-                    if item.LastSales[i].Price.Amount > \
+                    if sale_price_amount(item.sales[i].price) > \
                             mov_av[i] * (1 + self.boost_percent / 100):
-                        item.LastSales.pop(i)
+                        item.sales.pop(i)
                         delete_points += 1
                 if delete_points <= self.boost_points:
                     new_skins.append(item)
@@ -84,10 +101,10 @@ class OrderAnalytics:
 
         for skin, agr in zip(skins, aggregated):
             best_order = agr.orderBestPrice * 100
-            points_count = math.ceil(len(skin.LastSales) / 100 * self.good_points_percent)
+            points_count = math.ceil(len(skin.sales) / 100 * self.good_points_percent)
             count = 0
-            for i in skin.LastSales:
-                price_with_fee = i.Price.Amount * (1 - SELL_FEE / 100)
+            for i in skin.sales:
+                price_with_fee = sale_price_amount(i.price) * (1 - SELL_FEE / 100)
                 if price_with_fee > best_order * (1 + self.profit_percent / 100):
                     count += 1
             if count >= points_count:
