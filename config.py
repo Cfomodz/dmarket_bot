@@ -1,8 +1,21 @@
 import sys
+from os import getenv
+
+from dotenv import load_dotenv
 from loguru import logger
 
 from api.schemas import Games
-from credentials import PUBLIC_KEY, SECRET_KEY
+
+load_dotenv()
+
+PUBLIC_KEY = getenv("DMARKET_PUBLIC_KEY")
+SECRET_KEY = getenv("DMARKET_SECRET_KEY")
+
+if not PUBLIC_KEY or not SECRET_KEY:
+    raise RuntimeError(
+        "Missing DMarket API credentials. Copy .env.example to .env and set "
+        "DMARKET_PUBLIC_KEY and DMARKET_SECRET_KEY."
+    )
 
 logger_config = {
     "handlers": [
@@ -29,8 +42,8 @@ class Timers:
 
 
 class PrevParams:
-    MIN_AVG_PRICE = 16
-    MAX_AVG_PRICE = 17
+    MIN_AVG_PRICE = 90
+    MAX_AVG_PRICE = 225
 
 
 class BuyParams:

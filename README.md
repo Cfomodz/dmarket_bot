@@ -12,76 +12,70 @@ Bot for automatic trading on dmarket
 
 ## Quick Setup
 
-These instructions will guide you through setting up the `dmarket_bot` using our automated installer scripts. Ensure you have Git and Python 3 installed on your system before proceeding.
+Requirements:
 
----
+- Python 3.10+
+- Git
+- DMarket public and secret API keys
 
-### For macOS / Linux Users
+Clone the repository:
 
-1.  **Run the Installer:**
-    Open your Terminal and execute the following command:
-    ```bash
-    bash -c "$(curl -fsSL [https://raw.githubusercontent.com/Cfomodz/dmarket_bot/main/installer.sh](https://raw.githubusercontent.com/Cfomodz/dmarket_bot/main/installer.sh))"
-    ```
-    This command downloads and runs the `installer.sh` script. The script will:
-    * Clone the `dmarket_bot` repository from GitHub.
-    * Navigate into the cloned `dmarket_bot` directory.
-    * Create a Python virtual environment named `venv`.
-    * Activate the virtual environment.
-    * Install all required Python packages from `requirements.txt`.
-    * Create a template `credentials.py` file with placeholder API keys.
-    The script will output its progress to the terminal.
+```bash
+git clone https://github.com/Cfomodz/dmarket_bot.git
+cd dmarket_bot
+```
 
-2.  **Configure API Keys:**
-    Once the installer script is complete:
-    * Ensure you are in the `dmarket_bot` directory (the script should leave you there). If not, navigate to it: `cd dmarket_bot`
-    * Open the `credentials.py` file using a text editor (e.g., `nano credentials.py`, `vim credentials.py`, or open it with your preferred GUI editor).
-    * Inside `credentials.py`, replace `"YOUR_PUBLIC_API_KEY_HERE"` and `"YOUR_SECRET_API_KEY_HERE"` with your actual DMarket Public and Secret API keys respectively. Save the file.
+Create and activate a virtual environment:
 
-3.  **Run the Bot:**
-    After configuring your API keys:
-    * Make sure the virtual environment is active (your terminal prompt should typically show `(venv)`). If it's not active, run: `source venv/bin/activate`
-    * Execute the main bot script:
-        ```bash
-        python main.py 
-        ```
-    
----
+```bash
+python -m venv venv
+```
 
-### For Windows Users (PowerShell)
+On macOS or Linux:
 
-1.  **Run the Installer:**
-    Open PowerShell (you can search for "PowerShell" in the Start Menu. If you encounter issues, try running PowerShell as Administrator) and execute the following command:
-    ```powershell
-    Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12 -bor [System.Net.SecurityProtocolType]::Tls11 -bor [System.Net.SecurityProtocolType]::Tls; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('[https://raw.githubusercontent.com/Cfomodz/dmarket_bot/main/installer.ps1](https://raw.githubusercontent.com/Cfomodz/dmarket_bot/main/installer.ps1)'))
-    ```
-    This command performs several actions:
-    * `Set-ExecutionPolicy Bypass -Scope Process -Force;`: Temporarily allows the current PowerShell session to run scripts without being restricted by the execution policy. This change only applies to this specific PowerShell window and session.
-    * `[System.Net.ServicePointManager]::SecurityProtocol = ...;`: Ensures that modern TLS security protocols (TLS 1.2, 1.1, 1.0) are enabled for the web request, which helps with downloading from GitHub securely.
-    * `Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('...'))`: Downloads the `installer.ps1` script from your GitHub repository and immediately executes it.
-    The script will output its progress. It will:
-    * Clone the `dmarket_bot` repository.
-    * Navigate into the cloned `dmarket_bot` directory.
-    * Create a Python virtual environment named `venv`.
-    * Attempt to activate the virtual environment (it will provide instructions if manual activation or execution policy changes are needed).
-    * Install all required Python packages from `requirements.txt`.
-    * Create a template `credentials.py` file with placeholder API keys.
-    * The script may pause at the end; press Enter to close its window if it does so when run in a new window.
+```bash
+source venv/bin/activate
+```
 
-2.  **Configure API Keys:**
-    Once the installer script is complete:
-    * Navigate to the `dmarket_bot` directory if you're not already there (e.g., `cd dmarket_bot`). This directory is typically created in your user profile folder (e.g., `C:\Users\YourUserName\dmarket_bot`).
-    * Open the `credentials.py` file using a text editor (e.g., Notepad, VS Code, or by typing `notepad credentials.py` in PowerShell while in the `dmarket_bot` directory).
-    * Inside `credentials.py`, replace `"YOUR_PUBLIC_API_KEY_HERE"` and `"YOUR_SECRET_API_KEY_HERE"` with your actual DMarket Public and Secret API keys respectively. Save the file.
+On Windows PowerShell:
 
-3.  **Run the Bot:**
-    After configuring your API keys:
-    * Ensure you are in the `dmarket_bot` directory in PowerShell.
-    * Activate the virtual environment if it's not already active (the script attempts this, but if you open a new terminal or it failed, run): `.\venv\Scripts\Activate.ps1`
-    * Execute the main bot script:
-        ```powershell
-        python main.py
-        ```
+```powershell
+.\venv\Scripts\Activate.ps1
+```
+
+Install dependencies:
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Create your local environment file:
+
+```bash
+cp .env.example .env
+```
+
+On Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Edit `.env` and add your DMarket API keys:
+
+```dotenv
+DMARKET_PUBLIC_KEY=your_public_api_key_here
+DMARKET_SECRET_KEY=your_secret_api_key_here
+```
+
+Run the bot:
+
+```bash
+python main.py
+```
+
+The `.env` file is ignored by Git. Do not commit real API keys.
 
 
 ## Features:

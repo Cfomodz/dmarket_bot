@@ -7,11 +7,11 @@ from modules.orders import Orders
 from modules.offers import History, Offers
 
 
-bot = DMarketApi(PUBLIC_KEY, SECRET_KEY)
-skin_base = SkinBase(bot)
-orders = Orders(bot)
-history = History(bot)
-offers = Offers(bot)
+bot = None
+skin_base = None
+orders = None
+history = None
+offers = None
 
 
 async def create_pre_base():
@@ -86,26 +86,34 @@ async def delete_offers_loop():
 
 
 async def main_loop():
-    tasks = await asyncio.gather(
-        bot.get_money_loop(),
-        # delete_offers_loop(),
-        # history_loop(),
-        orders_loop(),
-        # add_to_sell_loop(),
-        # update_offers_loop(),
-        create_pre_base(),
-        return_exceptions=True
-    )
-    return tasks
+    global bot, skin_base, orders, history, offers
+
+    bot = DMarketApi(PUBLIC_KEY, SECRET_KEY)
+    skin_base = SkinBase(bot)
+    orders = Orders(bot)
+    history = History(bot)
+    offers = Offers(bot)
+
+    try:
+        return await asyncio.gather(
+            bot.get_money_loop(),
+            # delete_offers_loop(),
+            # history_loop(),
+            orders_loop(),
+            # add_to_sell_loop(),
+            # update_offers_loop(),
+            create_pre_base(),
+            return_exceptions=True
+        )
+    finally:
+        await bot.close()
 
 
 def main():
     try:
         logger.info('The bot is launching')
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(main_loop())
+        asyncio.run(main_loop())
     except KeyboardInterrupt:
-        asyncio.run(bot.close())
         logger.info('The bot is shutting down')
 
 

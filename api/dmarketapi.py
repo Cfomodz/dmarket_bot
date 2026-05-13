@@ -123,7 +123,7 @@ class DMarketApi:
 
     async def last_sales(self, item_name: str, game: Games = Games.RUST) -> LastSales:
         method = 'GET'
-        params = {'gameId': game.value, 'title': item_name}
+        params = {'gameId': game.value, 'title': item_name, 'limit': '20'}
         url_path = '/trade-aggregator/v1/last-sales'
         headers = self.generate_headers(method, url_path, params)
         url = API_URL + url_path

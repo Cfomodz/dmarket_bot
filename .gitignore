@@ -7,3 +7,5 @@ credentials.py
 test_logger.py
 test.py
 .env
+.env.*
+!.env.example

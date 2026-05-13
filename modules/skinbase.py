@@ -10,6 +10,16 @@ from api.schemas import MarketOffer, Games, SkinHistory
 from config import logger, PrevParams, BuyParams, Timers, BAD_ITEMS, GAMES
 
 
+def sale_price_amount(price: str) -> float:
+    value = re.sub(r"[^\d.,-]", "", price or "").replace(",", ".")
+    if not value:
+        return 0.0
+    amount = float(value)
+    if "." in value:
+        return amount * 100
+    return amount
+
+
 class SkinBase:
     def __init__(self, api: DMarketApi):
         self.api = api
@@ -58,9 +68,9 @@ class SkinBase:
             try:
                 history = await self.api.last_sales(i.title, game=game)
                 if len(history.sales) == 20:
-                    prices = [float(i.price) for i in history.sales]
+                    prices = [sale_price_amount(i.price) for i in history.sales]
                     avg_price = sum(prices) / len(prices)
-                    if min_p / 100 <= avg_price <= max_p / 100:
+                    if min_p <= avg_price <= max_p:
                         try:
                             sk = SkinHistory(
                                 title=i.title,
@@ -94,7 +104,7 @@ class SkinBase:
         now = time()
         await self.update_base()
         skins_to_update = [s for s in self.select_skin.select_update_time(now, self.repeat)
-                           if self.min_price_buy / 100 < round(s.avg_price, 2) < self.max_price_buy / 100]
+                           if self.min_price_buy < round(s.avg_price, 2) < self.max_price_buy]
         logger.debug(f'Skins to update: {len(skins_to_update)}')
         if not skins_to_update:
             logger.info('No skins to update are available.')
