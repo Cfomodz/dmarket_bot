@@ -1,9 +1,17 @@
-from typing import List
-from db.crud import SelectSkinOffer, SkinOffer
-from api.schemas import SellOffer, CreateOffer, CreateOffers, LastPrice, EditOffer, EditOffers, \
-    DeleteOffers, DeleteOffer
+
 from api.dmarketapi import DMarketApi
-from config import SellParams, logger, GAMES
+from api.schemas import (
+    CreateOffer,
+    CreateOffers,
+    DeleteOffer,
+    DeleteOffers,
+    EditOffer,
+    EditOffers,
+    LastPrice,
+    SellOffer,
+)
+from config import GAMES, SellParams, logger
+from db.crud import SelectSkinOffer, SkinOffer
 
 
 class History:
@@ -11,26 +19,42 @@ class History:
         self.bot = bot
 
     @staticmethod
-    def skins_db() -> List[SkinOffer]:
+    def skins_db() -> list[SkinOffer]:
         skins = SelectSkinOffer.select_all()
         if skins:
             return [i for i in skins if not i.sellTime]
         return list()
 
     async def save_skins(self):
-        logger.debug('Save skins')
-        buy = await self.bot.closed_targets(limit='100')
+        logger.debug("Save skins")
+        buy = await self.bot.closed_targets(limit="100")
         logger.debug(f"Buys: {len(buy.Trades)}")
         buy = buy.Trades
-        buy = [SellOffer(OfferID=i.OfferID, TargetID=i.TargetID, AssetID=i.AssetID,
-                         buyPrice=float(i.Price.Amount), Amount=i.Amount) for i in buy]
+        buy = [
+            SellOffer(
+                OfferID=i.OfferID,
+                TargetID=i.TargetID,
+                AssetID=i.AssetID,
+                buyPrice=float(i.Price.Amount),
+                Amount=i.Amount,
+            )
+            for i in buy
+        ]
         sold = []
         for game in GAMES:
-            sell = await self.bot.user_offers_closed(game=game, limit='100')
+            sell = await self.bot.user_offers_closed(game=game, limit="100")
             sold += sell.Trades
-        sell = [SellOffer(AssetID=i.AssetID, OfferID=i.OfferID,
-                          sellPrice=i.Price.Amount, sellTime=i.OfferClosedAt,
-                          title=i.Title, game='rust') for i in sold]
+        sell = [
+            SellOffer(
+                AssetID=i.AssetID,
+                OfferID=i.OfferID,
+                sellPrice=i.Price.Amount,
+                sellTime=i.OfferClosedAt,
+                title=i.Title,
+                game="rust",
+            )
+            for i in sold
+        ]
         buy_asset_ids = [s.AssetID for s in SelectSkinOffer.select_all()]
         for b in buy:
             if b.AssetID not in buy_asset_ids:
@@ -56,7 +80,7 @@ class Offers:
         self.min_percent = SellParams.MIN_PERCENT
 
     async def add_to_sell(self):
-        logger.debug('Add to sell')
+        logger.debug("Add to sell")
         skins = SelectSkinOffer.select_not_sell()
         inv_skins = []
         invent = []
@@ -65,11 +89,11 @@ class Offers:
             inv_skins += inv.objects
         for i in inv_skins:
             fee = 7
-            if 'custom' in i.fees['dmarket']['sell']:
-                fee = int(i.fees['dmarket']['sell']['custom']['percentage'])
+            if "custom" in i.fees["dmarket"]["sell"]:
+                fee = int(i.fees["dmarket"]["sell"]["custom"]["percentage"])
             if i.inMarket:
                 invent.append(SellOffer(AssetID=i.itemId, title=i.title, game=i.gameId, fee=fee))
-        logger.debug(f'Invent: {len(invent)}')
+        logger.debug(f"Invent: {len(invent)}")
         create_offers = []
         for i in invent:
             for j in skins:
@@ -79,8 +103,12 @@ class Offers:
             if i.sellPrice is None or i.sellPrice < 0.05:
                 continue
             try:
-                create_offers.append(CreateOffer(AssetID=i.AssetID,
-                                                 Price=LastPrice(Currency='USD', Amount=round(i.sellPrice, 2))))
+                create_offers.append(
+                    CreateOffer(
+                        AssetID=i.AssetID,
+                        Price=LastPrice(Currency="USD", Amount=round(i.sellPrice, 2)),
+                    )
+                )
             except TypeError:
                 pass
 
@@ -92,7 +120,7 @@ class Offers:
                         j.sellPrice = i.CreateOffer.Price.Amount
                         j.OfferID = i.OfferID
                         SelectSkinOffer.update_offer_id(j)
-        logger.debug(f'Add to sell: {add}')
+        logger.debug(f"Add to sell: {add}")
 
     @staticmethod
     def offer_price(max_p, min_p, best) -> float:
@@ -104,10 +132,11 @@ class Offers:
             return max_p
 
     async def update_offers(self):
-        logger.debug('Update offers')
-        on_sale = sorted([i for i in SelectSkinOffer.select_not_sell() if i.OfferID],
-                         key=lambda x: x.title)
-        logger.debug(f'On sale: {len(on_sale)}')
+        logger.debug("Update offers")
+        on_sale = sorted(
+            [i for i in SelectSkinOffer.select_not_sell() if i.OfferID], key=lambda x: x.title
+        )
+        logger.debug(f"On sale: {len(on_sale)}")
         names = [i.title for i in on_sale if i.title]
         if not names:
             return
@@ -125,8 +154,13 @@ class Offers:
                 price = self.offer_price(max_sell_price, min_sell_price, best_price)
                 if round(price, 2) != round(i.sellPrice, 2):
                     i.sellPrice = price
-                    items_to_update.append(EditOffer(OfferID=i.OfferID, AssetID=i.AssetID,
-                                                     Price=LastPrice(Currency='USD', Amount=round(i.sellPrice, 2))))
+                    items_to_update.append(
+                        EditOffer(
+                            OfferID=i.OfferID,
+                            AssetID=i.AssetID,
+                            Price=LastPrice(Currency="USD", Amount=round(i.sellPrice, 2)),
+                        )
+                    )
 
         if not items_to_update:
             return
@@ -137,9 +171,12 @@ class Offers:
                     j.sellPrice = i.EditOffer.Price.Amount
                     j.OfferID = i.NewOfferID
                     SelectSkinOffer.update_offer_id(j)
-        logger.debug(f'UPDATE OFFERS: {updated}')
+        logger.debug(f"UPDATE OFFERS: {updated}")
 
     async def delete_all_offers(self):
-        offers = await self.bot.user_offers(status='OfferStatusActive')
-        do = [DeleteOffer(itemId=o.AssetID, offerId=o.Offer.OfferID, price=o.Offer.Price) for o in offers.Items]
+        offers = await self.bot.user_offers(status="OfferStatusActive")
+        do = [
+            DeleteOffer(itemId=o.AssetID, offerId=o.Offer.OfferID, price=o.Offer.Price)
+            for o in offers.Items
+        ]
         await self.bot.user_offers_delete(DeleteOffers(objects=do))

@@ -1,11 +1,34 @@
-/venv
-.idea/
+# Python
 __pycache__/
-*.db
-*.log
-credentials.py
-test_logger.py
-test.py
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+
+# Environment / secrets
 .env
 .env.*
 !.env.example
+credentials.py
+
+# Database / logs
+*.db
+*.log
+
+# IDE
+.idea/
+
+# Test / type-check artefacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Scratch files
+test_logger.py
+test.py

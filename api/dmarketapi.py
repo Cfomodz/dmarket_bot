@@ -1,20 +1,43 @@
 import asyncio
-import aiohttp
 import json
-from datetime import datetime
 from asyncio import CancelledError
-from typing import List, Mapping
-from nacl.bindings import crypto_sign
+from collections.abc import Mapping
+from datetime import datetime
+
+import aiohttp
 from furl import furl
-from config import API_URL, logger
-from api.exceptions import *
-from api.schemas import (
-    Balance, Games, LastSales, MarketOffers,
-    AggregatedPrice, AggregatedPricesRequest, AggregatedPriceFilter, AggregatedPricesResponse,
-    UserTargets, ClosedTargets, Target, UserItems, CreateOffers, CreateOffersResponse,
-    EditOffers, EditOffersResponse, DeleteOffers, CreateTargets, CumulativePrices,
-    ClosedOffers,
+from nacl.bindings import crypto_sign
+
+from api.exceptions import (
+    BadAPIKeyException,
+    BadGatewayError,
+    BadRequestError,
+    TooManyRequests,
+    WrongResponseException,
 )
+from api.schemas import (
+    AggregatedPrice,
+    AggregatedPriceFilter,
+    AggregatedPricesRequest,
+    AggregatedPricesResponse,
+    Balance,
+    ClosedOffers,
+    ClosedTargets,
+    CreateOffers,
+    CreateOffersResponse,
+    CreateTargets,
+    CumulativePrices,
+    DeleteOffers,
+    EditOffers,
+    EditOffersResponse,
+    Games,
+    LastSales,
+    MarketOffers,
+    Target,
+    UserItems,
+    UserTargets,
+)
+from config import API_URL, logger
 
 
 class DMarketApi:
@@ -27,7 +50,9 @@ class DMarketApi:
     async def close(self):
         return await self.session.close()
 
-    def generate_headers(self, method: str, api_path: str, params: dict = None, body: dict = None) -> dict:
+    def generate_headers(
+        self, method: str, api_path: str, params: dict = None, body: dict = None
+    ) -> dict:
         nonce = str(round(datetime.now().timestamp()))
         string_to_sign = method + api_path
         string_to_sign = str(furl(string_to_sign).add(params))
@@ -35,7 +60,7 @@ class DMarketApi:
             string_to_sign += json.dumps(body)
         string_to_sign += nonce
         signature_prefix = "dmar ed25519 "
-        encoded = string_to_sign.encode('utf-8')
+        encoded = string_to_sign.encode("utf-8")
         secret_bytes = bytes.fromhex(self.SECRET_KEY)
         signature_bytes = crypto_sign(encoded, secret_bytes)
         signature = signature_bytes[:64].hex()
@@ -43,7 +68,7 @@ class DMarketApi:
         headers = {
             "X-Api-Key": self.PUBLIC_KEY,
             "X-Request-Sign": signature_prefix + signature,
-            "X-Sign-Date": nonce
+            "X-Sign-Date": nonce,
         }
         return headers
 
@@ -57,55 +82,60 @@ class DMarketApi:
             raise TooManyRequests()
         if response_status == 401:
             raise BadAPIKeyException()
-        if response_status != 200 and 'application/json' not in headers.get('content-type', ''):
+        if response_status != 200 and "application/json" not in headers.get("content-type", ""):
             raise WrongResponseException(response_text)
 
     async def validate_response(self, response: aiohttp.ClientResponse) -> dict:
         headers = response.headers
-        if 'RateLimit-Remaining' not in headers:
+        if "RateLimit-Remaining" not in headers:
             await asyncio.sleep(5)
-        if 'RateLimit-Remaining' in headers and headers['RateLimit-Remaining'] in ['1', '0']:
-            await asyncio.sleep(int(headers['RateLimit-Reset']))
+        if "RateLimit-Remaining" in headers and headers["RateLimit-Remaining"] in ["1", "0"]:
+            await asyncio.sleep(int(headers["RateLimit-Reset"]))
         response_status = response.status
         response_text = await response.text()
         self.catch_exception(response_status, headers, response_text)
         body = await response.json()
         return body
 
-    async def api_call(self, url: str, method: str, headers: dict, params: dict = None,
-                       body: dict = None) -> dict:
-        if method == 'GET':
+    async def api_call(
+        self, url: str, method: str, headers: dict, params: dict = None, body: dict = None
+    ) -> dict:
+        if method == "GET":
             async with self.session.get(url, params=params, headers=headers) as response:
                 return await self.validate_response(response)
-        elif method == 'DELETE':
-            async with self.session.delete(url, params=params, json=body, headers=headers) as response:
+        elif method == "DELETE":
+            async with self.session.delete(
+                url, params=params, json=body, headers=headers
+            ) as response:
                 return await self.validate_response(response)
         else:
-            async with self.session.post(url, params=params, json=body, headers=headers) as response:
+            async with self.session.post(
+                url, params=params, json=body, headers=headers
+            ) as response:
                 return await self.validate_response(response)
 
     # ACCOUNT
     # ----------------------------------------------------------------
 
     async def user(self):
-        method = 'GET'
-        url_path = '/account/v1/user'
+        method = "GET"
+        url_path = "/account/v1/user"
         headers = self.generate_headers(method, url_path)
         url = API_URL + url_path
         return await self.api_call(url, method, headers)
 
     async def get_balance(self):
-        method = 'GET'
-        url_path = '/account/v1/balance'
+        method = "GET"
+        url_path = "/account/v1/balance"
         headers = self.generate_headers(method, url_path)
         url = API_URL + url_path
         response = await self.api_call(url, method, headers=headers)
-        if 'usd' in response:
+        if "usd" in response:
             self.balance = Balance(**response).usd
-            logger.debug(f'BALANCE: {self.balance}')
+            logger.debug(f"BALANCE: {self.balance}")
             return self.balance
         else:
-            logger.debug(f'{response}')
+            logger.debug(f"{response}")
 
     async def get_money_loop(self) -> None:
         while True:
@@ -115,47 +145,68 @@ class DMarketApi:
             except (KeyboardInterrupt, CancelledError):
                 break
             except Exception as e:
-                logger.error(f'Failed to get balance: {e}. Sleep for 5 seconds.')
+                logger.error(f"Failed to get balance: {e}. Sleep for 5 seconds.")
                 await asyncio.sleep(5)
 
     # MARKET METHODS
     # ------------------------------------------------------------------
 
     async def last_sales(self, item_name: str, game: Games = Games.RUST) -> LastSales:
-        method = 'GET'
-        params = {'gameId': game.value, 'title': item_name, 'limit': '20'}
-        url_path = '/trade-aggregator/v1/last-sales'
+        method = "GET"
+        params = {"gameId": game.value, "title": item_name, "limit": "20"}
+        url_path = "/trade-aggregator/v1/last-sales"
         headers = self.generate_headers(method, url_path, params)
         url = API_URL + url_path
         response = await self.api_call(url, method, headers, params)
         return LastSales(**response)
 
-    async def market_offers(self, game: Games = Games.RUST, name: str = '', limit: int = 100,
-                            offset: int = 0, orderby: str = 'price', orderdir: str = 'asc',
-                            tree_filters: str = '', currency: str = 'USD', price_from: int = 0,
-                            price_to: int = 0, types: str = 'dmarket', cursor: str = '') -> MarketOffers:
-        method = 'GET'
-        url_path = '/exchange/v1/market/items'
-        params = {'gameId': game.value, 'title': name, 'limit': limit, 'orderBy': orderby,
-                  'currency': currency, 'offset': offset, 'orderDir': orderdir,
-                  'treeFilters': tree_filters, 'priceFrom': price_from, 'priceTo': price_to,
-                  'types': types, 'cursor': cursor}
+    async def market_offers(
+        self,
+        game: Games = Games.RUST,
+        name: str = "",
+        limit: int = 100,
+        offset: int = 0,
+        orderby: str = "price",
+        orderdir: str = "asc",
+        tree_filters: str = "",
+        currency: str = "USD",
+        price_from: int = 0,
+        price_to: int = 0,
+        types: str = "dmarket",
+        cursor: str = "",
+    ) -> MarketOffers:
+        method = "GET"
+        url_path = "/exchange/v1/market/items"
+        params = {
+            "gameId": game.value,
+            "title": name,
+            "limit": limit,
+            "orderBy": orderby,
+            "currency": currency,
+            "offset": offset,
+            "orderDir": orderdir,
+            "treeFilters": tree_filters,
+            "priceFrom": price_from,
+            "priceTo": price_to,
+            "types": types,
+            "cursor": cursor,
+        }
         headers = self.generate_headers(method, url_path, params)
         url = API_URL + url_path
         response = await self.api_call(url, method, headers, params)
         return MarketOffers(**response)
 
-    async def aggregated_prices(self, names: List[str], game: str = 'rust',
-                                limit: int = 100) -> List[AggregatedPrice]:
+    async def aggregated_prices(
+        self, names: list[str], game: str = "rust", limit: int = 100
+    ) -> list[AggregatedPrice]:
         """POST /marketplace-api/v1/aggregated-prices - batch price lookup."""
-        method = 'POST'
-        url_path = '/marketplace-api/v1/aggregated-prices'
+        method = "POST"
+        url_path = "/marketplace-api/v1/aggregated-prices"
         all_items = []
         for i in range(0, len(names), 100):
-            batch = names[i:i + 100]
+            batch = names[i : i + 100]
             body = AggregatedPricesRequest(
-                limit=limit,
-                filter=AggregatedPriceFilter(game=game, titles=batch)
+                limit=limit, filter=AggregatedPriceFilter(game=game, titles=batch)
             ).model_dump()
             headers = self.generate_headers(method, url_path, body=body)
             url = API_URL + url_path
@@ -164,73 +215,85 @@ class DMarketApi:
             all_items.extend(parsed.aggregatedPrices)
         return all_items
 
-    async def offers_by_title(self, name: str, limit: int = 100, cursor: str = '') -> MarketOffers:
-        method = 'GET'
-        url_path = '/exchange/v1/offers-by-title'
-        params = {'Title': name, 'Limit': limit, 'Cursor': cursor}
+    async def offers_by_title(self, name: str, limit: int = 100, cursor: str = "") -> MarketOffers:
+        method = "GET"
+        url_path = "/exchange/v1/offers-by-title"
+        params = {"Title": name, "Limit": limit, "Cursor": cursor}
         headers = self.generate_headers(method, url_path, params)
         url = API_URL + url_path
         response = await self.api_call(url, method, headers, params)
         return MarketOffers(**response)
 
-    async def user_targets(self, game: Games = Games.RUST, price_from: float = None,
-                           price_to: float = None, title: str = None, target_id: str = None,
-                           status: str = 'TargetStatusActive', limit: str = '100',
-                           cursor: str = '', currency: str = 'USD'):
-        method = 'GET'
-        url_path = '/marketplace-api/v1/user-targets'
-        params = {'BasicFilters.Status': status, 'GameId': game.value,
-                  'BasicFilters.Currency': currency, 'Limit': limit,
-                  'SortType': 'UserTargetsSortTypeDefault'}
+    async def user_targets(
+        self,
+        game: Games = Games.RUST,
+        price_from: float = None,
+        price_to: float = None,
+        title: str = None,
+        target_id: str = None,
+        status: str = "TargetStatusActive",
+        limit: str = "100",
+        cursor: str = "",
+        currency: str = "USD",
+    ):
+        method = "GET"
+        url_path = "/marketplace-api/v1/user-targets"
+        params = {
+            "BasicFilters.Status": status,
+            "GameId": game.value,
+            "BasicFilters.Currency": currency,
+            "Limit": limit,
+            "SortType": "UserTargetsSortTypeDefault",
+        }
         if price_from:
-            params['BasicFilters.PriceFrom'] = price_from
+            params["BasicFilters.PriceFrom"] = price_from
         if price_to:
-            params['BasicFilters.PriceTo'] = price_to
+            params["BasicFilters.PriceTo"] = price_to
         if title:
-            params['BasicFilters.Title'] = title
+            params["BasicFilters.Title"] = title
         if target_id:
-            params['BasicFilters.TargetID'] = target_id
+            params["BasicFilters.TargetID"] = target_id
         if cursor:
-            params['Cursor'] = cursor
+            params["Cursor"] = cursor
         headers = self.generate_headers(method, url_path, params)
         url = API_URL + url_path
         response = await self.api_call(url, method, headers, params)
         return UserTargets(**response)
 
-    async def closed_targets(self, limit: str = '100', order_dir: str = 'desc') -> ClosedTargets:
-        method = 'GET'
-        url_path = '/marketplace-api/v1/user-targets/closed'
-        params = {'Limit': limit, 'OrderDir': order_dir}
+    async def closed_targets(self, limit: str = "100", order_dir: str = "desc") -> ClosedTargets:
+        method = "GET"
+        url_path = "/marketplace-api/v1/user-targets/closed"
+        params = {"Limit": limit, "OrderDir": order_dir}
         headers = self.generate_headers(method, url_path, params)
         url = API_URL + url_path
         response = await self.api_call(url, method, headers, params)
         return ClosedTargets(**response)
 
     async def create_target(self, body: CreateTargets):
-        method = 'POST'
-        url_path = '/marketplace-api/v1/user-targets/create'
+        method = "POST"
+        url_path = "/marketplace-api/v1/user-targets/create"
         headers = self.generate_headers(method, url_path, body=body.model_dump())
         url = API_URL + url_path
         response = await self.api_call(url, method, headers, body=body.model_dump())
         return response
 
-    async def delete_target(self, targets: List[Target]):
-        method = 'POST'
-        url_path = '/marketplace-api/v1/user-targets/delete'
+    async def delete_target(self, targets: list[Target]):
+        method = "POST"
+        url_path = "/marketplace-api/v1/user-targets/delete"
         all_results = []
         for i in range(0, len(targets), 150):
-            batch = [{'TargetID': t.TargetID} for t in targets[i:i + 150]]
+            batch = [{"TargetID": t.TargetID} for t in targets[i : i + 150]]
             body = {"Targets": batch}
             headers = self.generate_headers(method, url_path, body=body)
             url = API_URL + url_path
             response = await self.api_call(url, method, headers, body=body)
-            all_results.extend(response.get('Result', []))
+            all_results.extend(response.get("Result", []))
         return all_results
 
     async def cumulative_price(self, name: str, game: str):
-        method = 'GET'
-        url_path = '/marketplace-api/v1/cumulative-price-levels'
-        params = {'Title': name, 'GameID': game}
+        method = "GET"
+        url_path = "/marketplace-api/v1/cumulative-price-levels"
+        params = {"Title": name, "GameID": game}
         headers = self.generate_headers(method, url_path, params)
         url = API_URL + url_path
         response = await self.api_call(url, method, headers, params)
@@ -239,48 +302,57 @@ class DMarketApi:
     # SELL ITEMS
     # ---------------------------------------------
 
-    async def user_inventory(self, game: Games = Games.RUST, in_market: bool = True,
-                             limit: str = '100') -> UserItems:
-        method = 'GET'
-        url_path = '/marketplace-api/v1/user-inventory'
-        params = {'GameID': game.value, 'BasicFilters.InMarket': str(in_market).lower(),
-                  'Limit': limit}
+    async def user_inventory(
+        self, game: Games = Games.RUST, in_market: bool = True, limit: str = "100"
+    ) -> UserItems:
+        method = "GET"
+        url_path = "/marketplace-api/v1/user-inventory"
+        params = {
+            "GameID": game.value,
+            "BasicFilters.InMarket": str(in_market).lower(),
+            "Limit": limit,
+        }
         headers = self.generate_headers(method, url_path, params=params)
         url = API_URL + url_path
         response = await self.api_call(url, method, headers, params=params)
         return UserItems(**response)
 
     async def user_items(self, game: Games = Games.RUST) -> MarketOffers:
-        method = 'GET'
-        url_path = '/exchange/v1/user/items'
-        params = {'gameId': game.value, 'currency': 'USD', 'limit': '50'}
+        method = "GET"
+        url_path = "/exchange/v1/user/items"
+        params = {"gameId": game.value, "currency": "USD", "limit": "50"}
         headers = self.generate_headers(method, url_path, params)
         url = API_URL + url_path
         response = await self.api_call(url, method, headers, params=params)
         return MarketOffers(**response)
 
-    async def user_offers(self, game: Games = Games.RUST, status: str = 'OfferStatusDefault',
-                          sort_type: str = 'UserOffersSortTypeDateNewestFirst', limit: str = '20'):
-        method = 'GET'
-        url_path = '/marketplace-api/v1/user-offers'
-        params = {'GameId': game.value, 'Status': status, 'Limit': limit, 'SortType': sort_type}
+    async def user_offers(
+        self,
+        game: Games = Games.RUST,
+        status: str = "OfferStatusDefault",
+        sort_type: str = "UserOffersSortTypeDateNewestFirst",
+        limit: str = "20",
+    ):
+        method = "GET"
+        url_path = "/marketplace-api/v1/user-offers"
+        params = {"GameId": game.value, "Status": status, "Limit": limit, "SortType": sort_type}
         headers = self.generate_headers(method, url_path, params)
         url = API_URL + url_path
         response = await self.api_call(url, method, headers, params=params)
         return UserItems(**response)
 
-    async def user_offers_closed(self, game: Games = Games.RUST, limit: str = '20'):
-        method = 'GET'
-        url_path = '/marketplace-api/v1/user-offers/closed'
-        params = {'GameId': game.value, 'Limit': limit, 'OrderDir': "desc"}
+    async def user_offers_closed(self, game: Games = Games.RUST, limit: str = "20"):
+        method = "GET"
+        url_path = "/marketplace-api/v1/user-offers/closed"
+        params = {"GameId": game.value, "Limit": limit, "OrderDir": "desc"}
         headers = self.generate_headers(method, url_path, params)
         url = API_URL + url_path
         response = await self.api_call(url, method, headers, params=params)
         return ClosedOffers(**response)
 
     async def user_offers_create(self, body: CreateOffers):
-        method = 'POST'
-        url_path = '/marketplace-api/v1/user-offers/create'
+        method = "POST"
+        url_path = "/marketplace-api/v1/user-offers/create"
         body = body.model_dump()
         headers = self.generate_headers(method, url_path, body=body)
         url = API_URL + url_path
@@ -288,8 +360,8 @@ class DMarketApi:
         return CreateOffersResponse(**response)
 
     async def user_offers_edit(self, body: EditOffers):
-        method = 'POST'
-        url_path = '/marketplace-api/v1/user-offers/edit'
+        method = "POST"
+        url_path = "/marketplace-api/v1/user-offers/edit"
         body = body.model_dump()
         headers = self.generate_headers(method, url_path, body=body)
         url = API_URL + url_path
@@ -297,8 +369,8 @@ class DMarketApi:
         return EditOffersResponse(**response)
 
     async def user_offers_delete(self, body: DeleteOffers):
-        method = 'DELETE'
-        url_path = '/exchange/v1/offers'
+        method = "DELETE"
+        url_path = "/exchange/v1/offers"
         body = body.model_dump()
         headers = self.generate_headers(method, url_path, body=body)
         url = API_URL + url_path

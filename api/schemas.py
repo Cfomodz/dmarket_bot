@@ -1,14 +1,14 @@
 import enum
 from datetime import datetime
-from typing import List, Optional, Union
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class Games(enum.Enum):
-    CS = 'a8db'
-    DOTA = '9a92'
-    RUST = 'rust'
-    TF2 = 'tf2'
+    CS = "a8db"
+    DOTA = "9a92"
+    RUST = "rust"
+    TF2 = "tf2"
 
 
 class Balance(BaseModel):
@@ -26,26 +26,26 @@ class LastSale(BaseModel):
 
 
 class LastSales(BaseModel):
-    sales: List[LastSale]
+    sales: list[LastSale]
 
 
 class MarketOfferPrice(BaseModel):
-    DMC: Union[int, str] = 0
-    USD: Union[int, str] = 0
+    DMC: int | str = 0
+    USD: int | str = 0
 
 
 class MarketOfferExtra(BaseModel):
-    categoryPath: Optional[str] = None
-    name: Optional[str] = None
-    title: Optional[str] = None
-    category: Optional[str] = None
-    gameId: Optional[Games] = None
-    groupId: Optional[int] = None
-    tradeLock: Optional[int] = None
-    rarity: Optional[str] = None
-    exterior: Optional[str] = None
-    type: Optional[str] = None
-    stickers: Optional[list] = None
+    categoryPath: str | None = None
+    name: str | None = None
+    title: str | None = None
+    category: str | None = None
+    gameId: Games | None = None
+    groupId: int | None = None
+    tradeLock: int | None = None
+    rarity: str | None = None
+    exterior: str | None = None
+    type: str | None = None
+    stickers: list | None = None
 
 
 class MarketOffer(BaseModel):
@@ -68,41 +68,43 @@ class MarketOffer(BaseModel):
 
 
 class MarketOffers(BaseModel):
-    cursor: Optional[str] = None
-    objects: List[MarketOffer]
+    cursor: str | None = None
+    objects: list[MarketOffer]
 
 
 # --- Aggregated Prices (POST /marketplace-api/v1/aggregated-prices) ---
 
+
 class AggregatedPriceFilter(BaseModel):
     game: str
-    titles: List[str]
+    titles: list[str]
 
 
 class AggregatedPricesRequest(BaseModel):
-    cursor: Optional[str] = None
+    cursor: str | None = None
     limit: int = 100
     filter: AggregatedPriceFilter
 
 
 class AggregatedPrice(BaseModel):
     title: str
-    orderBestPrice: Optional[float] = 0
-    orderCount: Optional[int] = 0
-    offerBestPrice: Optional[float] = 0
-    offerCount: Optional[int] = 0
+    orderBestPrice: float | None = 0
+    orderCount: int | None = 0
+    offerBestPrice: float | None = 0
+    offerCount: int | None = 0
 
 
 class AggregatedPricesResponse(BaseModel):
-    aggregatedPrices: List[AggregatedPrice]
-    nextCursor: Optional[str] = None
+    aggregatedPrices: list[AggregatedPrice]
+    nextCursor: str | None = None
 
 
 # --- Targets (Buy Orders) ---
 
+
 class TargetAttributes(BaseModel):
-    Name: Optional[str] = None
-    Value: Optional[str] = None
+    Name: str | None = None
+    Value: str | None = None
 
 
 class Target(BaseModel):
@@ -111,13 +113,13 @@ class Target(BaseModel):
     Amount: str
     Status: str
     GameID: Games
-    GameType: Optional[str] = None
-    Attributes: List[TargetAttributes]
+    GameType: str | None = None
+    Attributes: list[TargetAttributes]
     Price: LastPrice
 
 
 class UserTargets(BaseModel):
-    Items: List[Target]
+    Items: list[Target]
     Total: int
     Cursor: str
 
@@ -131,7 +133,7 @@ class ClosedTarget(BaseModel):
 
 
 class ClosedTargets(BaseModel):
-    Trades: List[ClosedTarget]
+    Trades: list[ClosedTarget]
     Total: int
 
 
@@ -139,20 +141,21 @@ class CreateTarget(BaseModel):
     Amount: str
     Price: LastPrice
     Title: str
-    Attrs: Optional[List[TargetAttributes]] = None
+    Attrs: list[TargetAttributes] | None = None
 
 
 class CreateTargets(BaseModel):
     GameID: str
-    Targets: List[CreateTarget]
+    Targets: list[CreateTarget]
 
 
 # --- User Items / Inventory ---
 
+
 class Offer(BaseModel):
     OfferID: str
     Price: LastPrice
-    Fee: Optional[LastPrice] = None
+    Fee: LastPrice | None = None
     CreatedDate: str
 
 
@@ -179,26 +182,27 @@ class UserItem(BaseModel):
     Withdrawable: bool
     Depositable: bool
     Tradable: bool
-    Attributes: List[TargetAttributes]
+    Attributes: list[TargetAttributes]
     Offer: Offer
-    Fee: Optional[LastPrice] = None
-    MarketPrice: Optional[LastPrice] = None
+    Fee: LastPrice | None = None
+    MarketPrice: LastPrice | None = None
     ClassID: str
 
 
 class ClosedOffers(BaseModel):
-    Trades: List[ClosedOffer]
+    Trades: list[ClosedOffer]
     Total: str
-    Cursor: Optional[str] = None
+    Cursor: str | None = None
 
 
 class UserItems(BaseModel):
-    Items: List[UserItem]
+    Items: list[UserItem]
     Total: str
-    Cursor: Optional[str] = None
+    Cursor: str | None = None
 
 
 # --- Create / Edit / Delete Offers ---
+
 
 class CreateOffer(BaseModel):
     AssetID: str
@@ -210,7 +214,7 @@ class EditOffer(CreateOffer):
 
 
 class CreateOffers(BaseModel):
-    Offers: List[CreateOffer]
+    Offers: list[CreateOffer]
 
 
 class CreateOfferResponse(BaseModel):
@@ -220,11 +224,11 @@ class CreateOfferResponse(BaseModel):
 
 
 class CreateOffersResponse(BaseModel):
-    Result: List[CreateOfferResponse]
+    Result: list[CreateOfferResponse]
 
 
 class EditOffers(BaseModel):
-    Offers: List[EditOffer]
+    Offers: list[EditOffer]
 
 
 class EditOfferResponse(BaseModel):
@@ -234,7 +238,7 @@ class EditOfferResponse(BaseModel):
 
 
 class EditOffersResponse(BaseModel):
-    Result: List[EditOfferResponse]
+    Result: list[EditOfferResponse]
 
 
 class DeleteOffer(BaseModel):
@@ -245,15 +249,16 @@ class DeleteOffer(BaseModel):
 
 class DeleteOffers(BaseModel):
     force: bool = True
-    objects: List[DeleteOffer]
+    objects: list[DeleteOffer]
 
 
 # --- Internal bot models ---
 
+
 class SkinHistory(LastSales):
     game: str
     title: str
-    sales: List[LastSale]
+    sales: list[LastSale]
     avg_price: float
     update_time: datetime
 
@@ -261,20 +266,20 @@ class SkinHistory(LastSales):
 class SkinOrder(BaseModel):
     title: str
     game: Games
-    bestOrder: Optional[int] = None
-    maxPrice: Optional[int] = None
-    minPrice: Optional[int] = None
-    targetId: Optional[str] = None
+    bestOrder: int | None = None
+    maxPrice: int | None = None
+    minPrice: int | None = None
+    targetId: str | None = None
 
 
 class SellOffer(BaseModel):
     AssetID: str
-    title: Optional[str] = None
-    game: Optional[str] = None
-    OfferID: Optional[str] = None
-    sellTime: Optional[datetime] = None
-    buyPrice: Optional[float] = None
-    sellPrice: Optional[float] = None
+    title: str | None = None
+    game: str | None = None
+    OfferID: str | None = None
+    sellTime: datetime | None = None
+    buyPrice: float | None = None
+    sellPrice: float | None = None
     buyTime: datetime = Field(default_factory=datetime.now)
     fee: int = 7
 
@@ -283,6 +288,7 @@ class SellOffer(BaseModel):
 
 # --- Cumulative Prices ---
 
+
 class CumulativePrice(BaseModel):
     Price: float
     Level: int
@@ -290,6 +296,6 @@ class CumulativePrice(BaseModel):
 
 
 class CumulativePrices(BaseModel):
-    Offers: List[CumulativePrice]
-    Targets: List[CumulativePrice]
+    Offers: list[CumulativePrice]
+    Targets: list[CumulativePrice]
     UpdatedAt: int

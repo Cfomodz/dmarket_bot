@@ -1,12 +1,13 @@
 """Tests for offers (sell side) management."""
-import pytest
+
 from unittest.mock import AsyncMock
-from modules.offers import Offers, History
+
+import pytest
+
 from api.schemas import (
-    SellOffer, LastPrice, AggregatedPrice, EditOffers,
-    MarketOffers, UserItems, ClosedOffers, ClosedOffer, ClosedTargets, ClosedTarget,
+    UserItems,
 )
-from tests.conftest import make_market_offer, make_aggregated_price
+from modules.offers import History, Offers
 
 
 class TestOfferPrice:
@@ -38,7 +39,7 @@ class TestOffers:
 
     @pytest.mark.asyncio
     async def test_delete_all_offers(self, mock_bot):
-        mock_bot.user_offers = AsyncMock(return_value=UserItems(Items=[], Total='0'))
+        mock_bot.user_offers = AsyncMock(return_value=UserItems(Items=[], Total="0"))
         offers = Offers(mock_bot)
         await offers.delete_all_offers()
         mock_bot.user_offers_delete.assert_called_once()
@@ -47,6 +48,5 @@ class TestOffers:
 class TestHistory:
     def test_skins_db_empty(self):
         # With empty database this would need mocking
-        history = History(None)
         # Just test that the static method exists and is callable
         assert callable(History.skins_db)
