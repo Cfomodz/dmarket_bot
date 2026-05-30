@@ -19,19 +19,32 @@ if not PUBLIC_KEY or not SECRET_KEY:
 
 logger_config = {
     "handlers": [
-        {"sink": sys.stderr, 'colorize': True, 'level': 'INFO'},
-        {"sink": sys.stderr, "serialize": False, 'level': 'DEBUG'},
-        {"sink": "log/info.log", "serialize": False, 'level': 'INFO'},
+        {"sink": sys.stderr, "colorize": True, "level": "INFO"},
+        {"sink": sys.stderr, "serialize": False, "level": "DEBUG"},
+        {"sink": "log/info.log", "serialize": False, "level": "INFO"},
     ]
 }
 logger.configure(**logger_config)
 
 API_URL = "https://api.dmarket.com"
 GAMES = [Games.RUST]
-DATABASE_NAME = '/skins.db'
+DATABASE_NAME = "skins.db"
 
-BAD_ITEMS = ['key', 'pin', 'sticker', 'case', 'operation', 'pass', 'capsule', 'package',
-             'challengers', 'patch', 'music', 'kit', 'graffiti']
+BAD_ITEMS = [
+    "key",
+    "pin",
+    "sticker",
+    "case",
+    "operation",
+    "pass",
+    "capsule",
+    "package",
+    "challengers",
+    "patch",
+    "music",
+    "kit",
+    "graffiti",
+]
 
 SELL_FEE = 7
 

@@ -1,9 +1,16 @@
 """Tests for custom exception classes."""
+
 import pytest
+
 from api.exceptions import (
-    Error, BadAPIKeyException, WrongResponseException,
-    UnknownError, InsufficientFundsException, TooManyRequests,
-    BadGatewayError, BadRequestError,
+    BadAPIKeyException,
+    BadGatewayError,
+    BadRequestError,
+    Error,
+    InsufficientFundsException,
+    TooManyRequests,
+    UnknownError,
+    WrongResponseException,
 )
 
 
@@ -30,15 +37,15 @@ class TestBadAPIKeyException:
         try:
             raise BadAPIKeyException()
         except BadAPIKeyException as e:
-            assert 'Bad API key' in str(e)
+            assert "Bad API key" in str(e)
 
 
 class TestWrongResponseException:
     def test_stores_response(self):
         try:
-            raise WrongResponseException('bad data')
+            raise WrongResponseException("bad data")
         except WrongResponseException as e:
-            assert e.response == 'bad data'
+            assert e.response == "bad data"
 
 
 class TestBadGatewayError:
@@ -46,18 +53,18 @@ class TestBadGatewayError:
         try:
             raise BadGatewayError()
         except BadGatewayError as e:
-            assert 'Bad gateway error' in str(e)
+            assert "Bad gateway error" in str(e)
 
     def test_custom_message(self):
         try:
-            raise BadGatewayError('custom error')
+            raise BadGatewayError("custom error")
         except BadGatewayError as e:
-            assert e.response == 'custom error'
+            assert e.response == "custom error"
 
 
 class TestUnknownError:
     def test_stores_response(self):
         try:
-            raise UnknownError('mystery')
+            raise UnknownError("mystery")
         except UnknownError as e:
-            assert e.response == 'mystery'
+            assert e.response == "mystery"

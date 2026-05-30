@@ -1,14 +1,23 @@
-from itertools import groupby
-from api.dmarketapi import DMarketApi
-from time import time
-from db.crud import SelectSkin
-from config import logger, BuyParams, Timers, GAMES, BAD_ITEMS, SELL_FEE
-from typing import List, Tuple
-from api.schemas import SkinHistory, SkinOrder, Target, CreateTarget, \
-    CreateTargets, LastPrice, TargetAttributes, CumulativePrice
 import math
 import re
+from itertools import groupby
+from time import time
+
 from pyti.simple_moving_average import simple_moving_average as sma
+
+from api.dmarketapi import DMarketApi
+from api.schemas import (
+    CreateTarget,
+    CreateTargets,
+    CumulativePrice,
+    LastPrice,
+    SkinHistory,
+    SkinOrder,
+    Target,
+    TargetAttributes,
+)
+from config import BAD_ITEMS, GAMES, SELL_FEE, BuyParams, Timers, logger
+from db.crud import SelectSkin
 
 
 def sale_price_amount(price: str) -> float:
@@ -58,7 +67,7 @@ class OrderAnalytics:
         self.max_threshold = BuyParams.MAX_THRESHOLD
         self.min_threshold = BuyParams.MIN_THRESHOLD
 
-    def popularity_control(self, skins: List[SkinHistory]) -> List[SkinHistory]:
+    def popularity_control(self, skins: list[SkinHistory]) -> list[SkinHistory]:
         items = list()
         for skin in skins:
             if not skin.sales:
@@ -75,15 +84,16 @@ class OrderAnalytics:
                         items.append(skin)
         return items
 
-    def boost_control(self, skins: List[SkinHistory]) -> List[SkinHistory]:
+    def boost_control(self, skins: list[SkinHistory]) -> list[SkinHistory]:
         new_skins = list()
         for item in skins:
             mov_av = moving_average_5(item.sales)
             delete_points = 0
             try:
                 for i in range(len(mov_av[:-4])):
-                    if sale_price_amount(item.sales[i].price) > \
-                            mov_av[i] * (1 + self.boost_percent / 100):
+                    if sale_price_amount(item.sales[i].price) > mov_av[i] * (
+                        1 + self.boost_percent / 100
+                    ):
                         item.sales.pop(i)
                         delete_points += 1
                 if delete_points <= self.boost_points:
@@ -92,7 +102,7 @@ class OrderAnalytics:
                 pass
         return new_skins
 
-    async def good_skins(self, skins: List[SkinHistory]) -> List[SkinOrder]:
+    async def good_skins(self, skins: list[SkinHistory]) -> list[SkinOrder]:
         items = list()
         skins = sorted(skins, key=lambda x: x.title)
         names = [i.title for i in skins]
@@ -109,10 +119,12 @@ class OrderAnalytics:
                     count += 1
             if count >= points_count:
                 if agr.offerCount <= self.max_count_offers:
-                    items.append(SkinOrder(title=skin.title, bestOrder=int(best_order), game=skin.game))
+                    items.append(
+                        SkinOrder(title=skin.title, bestOrder=int(best_order), game=skin.game)
+                    )
         return items
 
-    async def frequency_skins(self, skins: List[SkinHistory]) -> List[SkinOrder]:
+    async def frequency_skins(self, skins: list[SkinHistory]) -> list[SkinOrder]:
         items = list()
         skins = sorted(skins, key=lambda x: x.title)
         names = [i.title for i in skins]
@@ -130,11 +142,13 @@ class OrderAnalytics:
                     count += 1
             if count >= points_count:
                 if agr.offerCount <= self.max_count_offers:
-                    items.append(SkinOrder(title=skin.title, bestOrder=int(best_order), game=skin.game))
+                    items.append(
+                        SkinOrder(title=skin.title, bestOrder=int(best_order), game=skin.game)
+                    )
         return items
 
     @staticmethod
-    def first_second_offer(info: List[CumulativePrice]) -> tuple:
+    def first_second_offer(info: list[CumulativePrice]) -> tuple:
         len_offers = len(info)
         if len_offers == 0:
             best_offer_price = 0
@@ -154,7 +168,7 @@ class OrderAnalytics:
 
     async def analyze_market_offers(self, skin: SkinHistory):
         market_info = await self.bot.cumulative_price(skin.title, skin.game)
-        len_avg = skin.sales[0:self.avg_price_count]
+        len_avg = skin.sales[0 : self.avg_price_count]
         avg_price_10 = sum(float(s.price) for s in len_avg) / len(len_avg)
         best_offer, second_offer, offers_count = self.first_second_offer(market_info.Offers)
         best_target, second_target, targets_count = self.first_second_offer(market_info.Targets)
@@ -166,12 +180,18 @@ class OrderAnalytics:
         profit_by_avg = -(best_target - (1 - SELL_FEE / 100) * avg_price_10) / best_target * 100
         return best_offer, best_target, offers_count, targets_count, profit, round(profit_by_avg, 2)
 
-    async def frequency2(self, skins: List[SkinHistory]) -> List[SkinOrder]:
+    async def frequency2(self, skins: list[SkinHistory]) -> list[SkinOrder]:
         items = list()
         skins = sorted(skins, key=lambda x: x.title)
         for skin in skins:
-            best_offer, best_target, offers_count, targets_count, profit, profit_2 = \
-                await self.analyze_market_offers(skin)
+            (
+                best_offer,
+                best_target,
+                offers_count,
+                targets_count,
+                profit,
+                profit_2,
+            ) = await self.analyze_market_offers(skin)
 
             if profit_2 > self.profit_percent and profit > self.profit_percent:
                 my_sell_price = best_target * 100 * (1 + self.profit_percent / 100)
@@ -183,34 +203,41 @@ class OrderAnalytics:
                         count += 1
                 if count >= points_count:
                     if offers_count <= self.max_count_offers:
-                        items.append(SkinOrder(title=skin.title, bestOrder=int(best_target * 100), game=skin.game))
+                        items.append(
+                            SkinOrder(
+                                title=skin.title, bestOrder=int(best_target * 100), game=skin.game
+                            )
+                        )
         return items
 
-    async def skins_to_buy(self) -> List[SkinOrder]:
+    async def skins_to_buy(self) -> list[SkinOrder]:
         t = time()
         new_skins = list()
         skins = []
         for game in GAMES:
             all_skins = SelectSkin.select_all()
-            logger.debug(f'ALL SKINS {len(all_skins)}')
-            skins += [i for i in all_skins if self.min_price < i.avg_price < self.max_price
-                      and i.game == game.value]
-        logger.info(f'SKINS {len(skins)}')
+            logger.debug(f"ALL SKINS {len(all_skins)}")
+            skins += [
+                i
+                for i in all_skins
+                if self.min_price < i.avg_price < self.max_price and i.game == game.value
+            ]
+        logger.info(f"SKINS {len(skins)}")
         if skins:
             skins = self.popularity_control(skins)
-            logger.info(f'POP CONTROL {len(skins)}')
+            logger.info(f"POP CONTROL {len(skins)}")
             skins = self.boost_control(skins)
-            logger.info(f'BOOST CONTROL {len(skins)}')
+            logger.info(f"BOOST CONTROL {len(skins)}")
             if self.frequency:
                 skins = await self.frequency2(skins)
             else:
                 skins = await self.good_skins(skins)
-            logger.info(f'GOOD CONTROL {len(skins)}')
+            logger.info(f"GOOD CONTROL {len(skins)}")
             for skin in skins:
                 skin.maxPrice = int(skin.bestOrder * (1 + self.max_threshold / 100))
                 skin.minPrice = int(skin.bestOrder * (1 - self.min_threshold / 100))
                 new_skins.append(skin)
-        logger.debug(f'Database of orders was updated {round(time() - t, 2)} sec.')
+        logger.debug(f"Database of orders was updated {round(time() - t, 2)} sec.")
         return new_skins
 
 
@@ -229,7 +256,9 @@ class Orders:
             return min_p
 
     @staticmethod
-    def sort_targets(skins: List[SkinOrder], targets: List[Target]) -> Tuple[List[SkinOrder], List[Target], List[Target]]:
+    def sort_targets(
+        skins: list[SkinOrder], targets: list[Target]
+    ) -> tuple[list[SkinOrder], list[Target], list[Target]]:
         good_targets = [i for i in targets if i.Title in [s.title for s in skins]]
         bad_targets = [i for i in targets if i.Title not in [s.title for s in skins]]
         new_skins = [i for i in skins if i.title not in [s.Title for s in targets]]
@@ -239,16 +268,18 @@ class Orders:
         offer = await self.bot.market_offers(name=item.title, limit=1, game=item.game)
         if offer.objects and offer.objects[0].title == item.title:
             offer = offer.objects[0]
-            price = LastPrice(Currency='USD', Amount=item.bestOrder / 100)
-            attributes = [TargetAttributes(Name='name', Value=offer.extra.name),
-                          TargetAttributes(Name='title', Value=offer.title),
-                          TargetAttributes(Name='category', Value=offer.extra.category),
-                          TargetAttributes(Name='gameId', Value=offer.gameId),
-                          TargetAttributes(Name='categoryPath', Value=offer.extra.categoryPath),
-                          TargetAttributes(Name='image', Value=offer.image)]
+            price = LastPrice(Currency="USD", Amount=item.bestOrder / 100)
+            attributes = [
+                TargetAttributes(Name="name", Value=offer.extra.name),
+                TargetAttributes(Name="title", Value=offer.title),
+                TargetAttributes(Name="category", Value=offer.extra.category),
+                TargetAttributes(Name="gameId", Value=offer.gameId),
+                TargetAttributes(Name="categoryPath", Value=offer.extra.categoryPath),
+                TargetAttributes(Name="image", Value=offer.image),
+            ]
             if offer.extra.exterior:
-                attributes.append(TargetAttributes(Name='exterior', Value=offer.extra.exterior))
-            target = CreateTarget(Amount='1', Price=price, Title=offer.title, Attrs=attributes)
+                attributes.append(TargetAttributes(Name="exterior", Value=offer.extra.exterior))
+            target = CreateTarget(Amount="1", Price=price, Title=offer.title, Attrs=attributes)
             targets = CreateTargets(GameID=offer.gameId, Targets=[target])
             order = await self.bot.create_target(targets)
             return order
@@ -263,28 +294,28 @@ class Orders:
 
     async def update_orders(self):
         t = time()
-        logger.debug('Update orders')
+        logger.debug("Update orders")
         skins = await self.order_list.skins_to_buy()
-        logger.debug(f'Skins to buy: {len(skins)}')
-        targets = await self.bot.user_targets(limit='1000')
+        logger.debug(f"Skins to buy: {len(skins)}")
+        targets = await self.bot.user_targets(limit="1000")
         name_group = [list(j) for _, j in groupby(targets.Items, key=lambda x: x.Title)]
-        targets_inactive = await self.bot.user_targets(limit='1000', status='TargetStatusInactive')
-        logger.debug(f'Inactive {len(targets_inactive.Items)}')
+        targets_inactive = await self.bot.user_targets(limit="1000", status="TargetStatusInactive")
+        logger.debug(f"Inactive {len(targets_inactive.Items)}")
         new, good, bad = self.sort_targets(skins, targets.Items)
         for name in name_group:
             if len(name) > 1:
                 bad += name[1:]
-        logger.debug(f'Bad {len(bad)}')
+        logger.debug(f"Bad {len(bad)}")
         await self.bot.delete_target(bad + targets_inactive.Items)
         for skin in new:
-            logger.info(f'{skin.title} {skin.bestOrder} {skin.minPrice} {skin.maxPrice}')
+            logger.info(f"{skin.title} {skin.bestOrder} {skin.minPrice} {skin.maxPrice}")
             if self.bot.balance > skin.bestOrder:
                 if any(i in skin.title.lower() for i in BAD_ITEMS):
                     continue
                 if await self.check_offers(skin):
                     await self.create_order(skin)
         if good:
-            logger.debug(f'Good {len(good)}')
+            logger.debug(f"Good {len(good)}")
             for i in good:
                 for j in skins:
                     if i.Title == j.title:
@@ -295,4 +326,4 @@ class Orders:
                                 await self.bot.delete_target([i])
                                 await self.create_order(j)
 
-        logger.debug(f'Orders were updated {round(time() - t, 2)} sec.')
+        logger.debug(f"Orders were updated {round(time() - t, 2)} sec.")

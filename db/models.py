@@ -1,6 +1,14 @@
 import datetime
 import json
-from playhouse.sqlite_ext import Model, CharField, FloatField, TextField, DateTimeField, IntegerField
+
+from playhouse.sqlite_ext import (
+    CharField,
+    DateTimeField,
+    FloatField,
+    IntegerField,
+    Model,
+    TextField,
+)
 from pydantic import BaseModel as PydanticBaseModel
 
 from db.database import db
@@ -8,10 +16,10 @@ from db.database import db
 
 def default(o):
     if isinstance(o, PydanticBaseModel):
-        return o.model_dump(mode='json')
+        return o.model_dump(mode="json")
     if isinstance(o, (datetime.date, datetime.datetime)):
         return o.isoformat()
-    raise TypeError(f'Object of type {type(o).__name__} is not JSON serializable')
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
 
 
 class JSONField(TextField):

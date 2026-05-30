@@ -1,0 +1,39 @@
+[project]
+name = "dmarket-bot"
+version = "0.1.0"
+description = "Automatic trading bot for the DMarket marketplace"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "aiohttp>=3.7.3",
+    "furl>=2.1.0",
+    "loguru>=0.5.3",
+    "peewee>=3.14.0,<4",
+    "pydantic>=2.0",
+    "PyNaCl>=1.4.0",
+    "python-dotenv>=1.0.0",
+    "pyti>=0.2.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.4.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "live: requires live DMarket API credentials — run with: uv run pytest -m live",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
