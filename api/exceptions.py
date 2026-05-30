@@ -1,7 +1,7 @@
 from config import logger
 
-__all__ = ['Error', 'BadGatewayError', 'WrongResponseException', 'BadAPIKeyException', 'InsufficientFundsException',
-            'UnknownError', 'TooManyRequests', 'BadRequestError']
+__all__ = ['Error', 'BadGatewayError', 'WrongResponseException', 'BadAPIKeyException',
+           'InsufficientFundsException', 'UnknownError', 'TooManyRequests', 'BadRequestError']
 
 
 class Error(Exception):
@@ -10,58 +10,39 @@ class Error(Exception):
 
 
 class BadAPIKeyException(Error):
-    """Bad api key exception."""
-
     def __init__(self):
-        logger.error('Bad API key used or Unauthorized'+Error)
+        logger.error('Bad API key used or Unauthorized')
+        super().__init__('Bad API key used or Unauthorized')
 
 
 class WrongResponseException(Error):
-    """An invalid response was received from the server"""
-
     def __init__(self, response_text: str):
-        """
-        :param response: Received response.
-        """
-        logger.error(f'Wrong response was received {response_text}')
+        logger.error(f'Wrong response was received: {response_text}')
         self.response = response_text
+        super().__init__(response_text)
 
 
 class UnknownError(Error):
-    """A unknown error occured."""
-
     def __init__(self, text: str):
-        """
-        :param text: Error text.
-        """
-        logger.error('Response contains unknown error')
-        logger.debug(text)
+        logger.error(f'Unknown error: {text}')
         self.response = text
+        super().__init__(text)
 
 
 class InsufficientFundsException(Error):
-    """Insufficient funds to complete the transaction."""
     pass
 
 
 class TooManyRequests(Error):
-    """The server received too many requests."""
     pass
 
 
 class BadGatewayError(Error):
-
     def __init__(self, text: str = ''):
-        """
-        :param text: Error text
-        """
-        if text == '':
-            logger.error('Bad gateway error')
-        else:
-            logger.error(text)
+        logger.error(text or 'Bad gateway error')
         self.response = text
+        super().__init__(text or 'Bad gateway error')
 
 
 class BadRequestError(Error):
-    """A incorrect method call occured."""
     pass

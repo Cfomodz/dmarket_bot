@@ -1,8 +1,21 @@
 import sys
+from os import getenv
+
+from dotenv import load_dotenv
 from loguru import logger
 
 from api.schemas import Games
-from credentials import PUBLIC_KEY, SECRET_KEY
+
+load_dotenv()
+
+PUBLIC_KEY = getenv("DMARKET_PUBLIC_KEY")
+SECRET_KEY = getenv("DMARKET_SECRET_KEY")
+
+if not PUBLIC_KEY or not SECRET_KEY:
+    raise RuntimeError(
+        "Missing DMarket API credentials. Copy .env.example to .env and set "
+        "DMARKET_PUBLIC_KEY and DMARKET_SECRET_KEY."
+    )
 
 logger_config = {
     "handlers": [
@@ -13,27 +26,24 @@ logger_config = {
 }
 logger.configure(**logger_config)
 
-
 API_URL = "https://api.dmarket.com"
-API_URL_TRADING = API_URL
-# GAMES = [Games.CS, Games.DOTA, Games.RUST]
-# GAMES = [Games.RUST, Games.DOTA]
 GAMES = [Games.RUST]
 DATABASE_NAME = '/skins.db'
 
-BAD_ITEMS = ['key', 'pin', 'sticker', 'case', 'operation', 'pass', 'capsule', 'package', 'challengers',
-            'patch', 'music', 'kit', 'graffiti']
+BAD_ITEMS = ['key', 'pin', 'sticker', 'case', 'operation', 'pass', 'capsule', 'package',
+             'challengers', 'patch', 'music', 'kit', 'graffiti']
+
+SELL_FEE = 7
 
 
 class Timers:
-    PREV_BASE = 60 * 60 * 5 # 5 hours
+    PREV_BASE = 60 * 60 * 5
     ORDERS_BASE = 60 * 10
 
 
 class PrevParams:
-    # POPULARITY = 3
-    MIN_AVG_PRICE = 16
-    MAX_AVG_PRICE = 17
+    MIN_AVG_PRICE = 90
+    MAX_AVG_PRICE = 225
 
 
 class BuyParams:
@@ -49,16 +59,16 @@ class BuyParams:
     ALL_SALES = 80
     DAYS_COUNT = 23
     SALE_COUNT = 11
-    LAST_SALE = 3  # Last sale no later than LAST_SALE days ago
-    FIRST_SALE = 20  # First purchase no later than FIRST_SALE days ago
+    LAST_SALE = 3
+    FIRST_SALE = 20
 
     MAX_COUNT_SELL_OFFERS = 20
 
     BOOST_PERCENT = 24
     BOOST_POINTS = 3
 
-    MAX_THRESHOLD = 0.1  # Maximum price increase for MAX_THRESHOLD in percent of the current order
-    MIN_THRESHOLD = 3  # Minimum price decrease by MIN_THRESHOLD in percent of the current order
+    MAX_THRESHOLD = 0.1
+    MIN_THRESHOLD = 3
 
 
 class SellParams:
