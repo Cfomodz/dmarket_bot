@@ -132,7 +132,7 @@ class SelectSkinOffer:
     def select_not_sell() -> list[SellOffer]:
         skins = SkinOffer.select().where(SkinOffer.sellTime == None)  # noqa: E711
         try:
-            return [SellOffer(AssetID=s.AssetID, buyPrice=s.buyPrice) for s in skins]
+            return [SellOffer.model_validate(s) for s in skins]
         except Exception as e:
             logger.error(f"Exception in select_not_sell: {e}")
             raise

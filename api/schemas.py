@@ -1,4 +1,5 @@
 import enum
+import re
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -11,18 +12,66 @@ class Games(enum.Enum):
     TF2 = "tf2"
 
 
+# --- Money conversion ---
+#
+# The bot works in INTEGER USD CENTS everywhere. DMarket endpoints disagree on
+# units (the exchange API uses cent strings, the marketplace API uses dollar
+# floats, last-sales uses dollar strings), so every response model exposes a
+# `*_cents` accessor and all conversions live here — never in trading logic.
+
+
+def dollars_to_cents(amount: float | str | None) -> int:
+    if amount is None:
+        return 0
+    return round(float(amount) * 100)
+
+
+def parse_money_cents(value: float | str | None) -> int:
+    """Parse a price that may be dollars ("1.50") or cents ("150" / 150).
+
+    Values containing a decimal separator are dollars; bare integers are
+    already cents.
+    """
+    if value is None:
+        return 0
+    if isinstance(value, str):
+        value = re.sub(r"[^\d.,-]", "", value).replace(",", ".")
+        if not value:
+            return 0
+        if "." in value:
+            return round(float(value) * 100)
+        return int(value)
+    if isinstance(value, float) and not value.is_integer():
+        return dollars_to_cents(value)
+    return int(value)
+
+
 class Balance(BaseModel):
-    usd: int
+    usd: int  # cents
 
 
 class LastPrice(BaseModel):
+    """Marketplace-api price object. `Amount` is DOLLARS on the wire."""
+
     Currency: str
     Amount: float
+
+    @property
+    def amount_cents(self) -> int:
+        return dollars_to_cents(self.Amount)
+
+    @classmethod
+    def from_cents(cls, cents: float, currency: str = "USD") -> "LastPrice":
+        return cls(Currency=currency, Amount=round(cents) / 100)
 
 
 class LastSale(BaseModel):
     date: datetime
     price: str
+
+    @property
+    def price_cents(self) -> int:
+        return parse_money_cents(self.price)
 
 
 class LastSales(BaseModel):
@@ -30,8 +79,14 @@ class LastSales(BaseModel):
 
 
 class MarketOfferPrice(BaseModel):
+    """Exchange-api price object. Values are CENTS on the wire ("150" = $1.50)."""
+
     DMC: int | str = 0
     USD: int | str = 0
+
+    @property
+    def usd_cents(self) -> int:
+        return parse_money_cents(self.USD)
 
 
 class MarketOfferExtra(BaseModel):
@@ -87,11 +142,21 @@ class AggregatedPricesRequest(BaseModel):
 
 
 class AggregatedPrice(BaseModel):
+    """Prices are DOLLARS on the wire."""
+
     title: str
     orderBestPrice: float | None = 0
     orderCount: int | None = 0
     offerBestPrice: float | None = 0
     offerCount: int | None = 0
+
+    @property
+    def order_best_price_cents(self) -> int:
+        return dollars_to_cents(self.orderBestPrice)
+
+    @property
+    def offer_best_price_cents(self) -> int:
+        return dollars_to_cents(self.offerBestPrice)
 
 
 class AggregatedPricesResponse(BaseModel):
@@ -259,16 +324,16 @@ class SkinHistory(LastSales):
     game: str
     title: str
     sales: list[LastSale]
-    avg_price: float
+    avg_price: float  # cents
     update_time: datetime
 
 
 class SkinOrder(BaseModel):
     title: str
     game: Games
-    bestOrder: int | None = None
-    maxPrice: int | None = None
-    minPrice: int | None = None
+    bestOrder: int | None = None  # cents
+    maxPrice: int | None = None  # cents
+    minPrice: int | None = None  # cents
     targetId: str | None = None
 
 
@@ -278,9 +343,9 @@ class SellOffer(BaseModel):
     game: str | None = None
     OfferID: str | None = None
     sellTime: datetime | None = None
-    buyPrice: float | None = None
-    sellPrice: float | None = None
-    buyTime: datetime = Field(default_factory=datetime.now)
+    buyPrice: float | None = None  # cents
+    sellPrice: float | None = None  # cents
+    buyTime: datetime | None = Field(default_factory=datetime.now)
     fee: int = 7
 
     model_config = ConfigDict(from_attributes=True)
@@ -290,9 +355,15 @@ class SellOffer(BaseModel):
 
 
 class CumulativePrice(BaseModel):
+    """`Price` is DOLLARS on the wire."""
+
     Price: float
     Level: int
     Amount: int
+
+    @property
+    def price_cents(self) -> int:
+        return dollars_to_cents(self.Price)
 
 
 class CumulativePrices(BaseModel):

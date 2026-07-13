@@ -14,8 +14,11 @@ from api.exceptions import (
 )
 from api.schemas import (
     AggregatedPrice,
+    CreateOffers,
     CreateTarget,
     CreateTargets,
+    DeleteOffers,
+    EditOffers,
     Games,
     LastPrice,
     Target,
@@ -223,6 +226,134 @@ class TestLastSalesEndpoint:
         call_args = api.api_call.call_args
         url = call_args[0][0]
         assert "/trade-aggregator/v1/last-sales" in url
+
+
+class TestDryRun:
+    @pytest.mark.asyncio
+    async def test_create_target_skips_api(self):
+        api = DMarketApi("pub_key", "0" * 128, dry_run=True)
+        api.api_call = AsyncMock()
+        body = CreateTargets(
+            GameID="rust",
+            Targets=[
+                CreateTarget(Amount="1", Price=LastPrice(Currency="USD", Amount=1.5), Title="T")
+            ],
+        )
+        result = await api.create_target(body)
+        api.api_call.assert_not_called()
+        assert result == {"Result": []}
+        await api.close()
+
+    @pytest.mark.asyncio
+    async def test_delete_target_skips_api(self):
+        api = DMarketApi("pub_key", "0" * 128, dry_run=True)
+        api.api_call = AsyncMock()
+        target = Target(
+            TargetID="t1",
+            Title="T",
+            Amount="1",
+            Status="Active",
+            GameID=Games.RUST,
+            Attributes=[],
+            Price=LastPrice(Currency="USD", Amount=1.0),
+        )
+        result = await api.delete_target([target])
+        api.api_call.assert_not_called()
+        assert result == []
+        await api.close()
+
+    @pytest.mark.asyncio
+    async def test_offer_mutations_skip_api(self):
+        api = DMarketApi("pub_key", "0" * 128, dry_run=True)
+        api.api_call = AsyncMock()
+        created = await api.user_offers_create(CreateOffers(Offers=[]))
+        edited = await api.user_offers_edit(EditOffers(Offers=[]))
+        deleted = await api.user_offers_delete(DeleteOffers(objects=[]))
+        api.api_call.assert_not_called()
+        assert created.Result == []
+        assert edited.Result == []
+        assert deleted == {}
+        await api.close()
+
+    @pytest.mark.asyncio
+    async def test_disabled_by_default(self):
+        api = DMarketApi("pub_key", "0" * 128)
+        assert api.dry_run is False
+        await api.close()
+
+
+class TestRetries:
+    @pytest.mark.asyncio
+    async def test_retries_on_429_then_succeeds(self):
+        api = DMarketApi("pub_key", "0" * 128)
+        api.RETRY_BACKOFF = 0
+        api._request = AsyncMock(side_effect=[TooManyRequests(), {"ok": True}])
+        result = await api.api_call("http://test.com", "GET", {})
+        assert result == {"ok": True}
+        assert api._request.call_count == 2
+        await api.close()
+
+    @pytest.mark.asyncio
+    async def test_raises_after_max_retries(self):
+        api = DMarketApi("pub_key", "0" * 128)
+        api.RETRY_BACKOFF = 0
+        api._request = AsyncMock(side_effect=BadGatewayError())
+        with pytest.raises(BadGatewayError):
+            await api.api_call("http://test.com", "GET", {})
+        assert api._request.call_count == api.MAX_RETRIES + 1
+        await api.close()
+
+    @pytest.mark.asyncio
+    async def test_no_retry_on_bad_request(self):
+        api = DMarketApi("pub_key", "0" * 128)
+        api.RETRY_BACKOFF = 0
+        api._request = AsyncMock(side_effect=BadRequestError())
+        with pytest.raises(BadRequestError):
+            await api.api_call("http://test.com", "GET", {})
+        assert api._request.call_count == 1
+        await api.close()
+
+
+class TestRateLimitSleep:
+    @pytest.mark.asyncio
+    async def test_no_sleep_when_remaining_high(self, monkeypatch):
+        api = DMarketApi("pub_key", "0" * 128)
+        sleeps = []
+
+        async def fake_sleep(s):
+            sleeps.append(s)
+
+        monkeypatch.setattr("api.dmarketapi.asyncio.sleep", fake_sleep)
+        await api._rate_limit_sleep({"RateLimit-Remaining": "50", "RateLimit-Reset": "10"})
+        assert sleeps == []
+        await api.close()
+
+    @pytest.mark.asyncio
+    async def test_sleep_clamped_for_epoch_timestamps(self, monkeypatch):
+        api = DMarketApi("pub_key", "0" * 128)
+        sleeps = []
+
+        async def fake_sleep(s):
+            sleeps.append(s)
+
+        monkeypatch.setattr("api.dmarketapi.asyncio.sleep", fake_sleep)
+        # An epoch timestamp far in the future must not cause a decades-long sleep
+        await api._rate_limit_sleep({"RateLimit-Remaining": "0", "RateLimit-Reset": "99999999999"})
+        assert sleeps and sleeps[0] <= api.MAX_RATE_LIMIT_SLEEP
+        await api.close()
+
+    @pytest.mark.asyncio
+    async def test_missing_header_does_not_sleep(self, monkeypatch):
+        api = DMarketApi("pub_key", "0" * 128)
+        sleeps = []
+
+        async def fake_sleep(s):
+            sleeps.append(s)
+
+        monkeypatch.setattr("api.dmarketapi.asyncio.sleep", fake_sleep)
+        await api._rate_limit_sleep({})
+        assert sleeps == []
+        await api.close()
 
 
 class TestApiCallRouting:

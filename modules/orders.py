@@ -1,5 +1,4 @@
 import math
-import re
 from itertools import groupby
 from time import time
 
@@ -20,22 +19,12 @@ from config import BAD_ITEMS, GAMES, SELL_FEE, BuyParams, Timers, logger
 from db.crud import SelectSkin
 
 
-def sale_price_amount(price: str) -> float:
-    value = re.sub(r"[^\d.,-]", "", price or "").replace(",", ".")
-    if not value:
-        return 0.0
-    amount = float(value)
-    if "." in value:
-        return amount * 100
-    return amount
-
-
 def sale_timestamp(sale) -> int:
     return int(sale.date.timestamp())
 
 
 def moving_average_5(history) -> list:
-    prices = [sale_price_amount(i.price) for i in history]
+    prices = [i.price_cents for i in history]
     prices.reverse()
     result = list(sma(prices, 5))
     result.reverse()
@@ -91,9 +80,7 @@ class OrderAnalytics:
             delete_points = 0
             try:
                 for i in range(len(mov_av[:-4])):
-                    if sale_price_amount(item.sales[i].price) > mov_av[i] * (
-                        1 + self.boost_percent / 100
-                    ):
+                    if item.sales[i].price_cents > mov_av[i] * (1 + self.boost_percent / 100):
                         item.sales.pop(i)
                         delete_points += 1
                 if delete_points <= self.boost_points:
@@ -110,11 +97,11 @@ class OrderAnalytics:
         aggregated = sorted(aggregated, key=lambda x: x.title)
 
         for skin, agr in zip(skins, aggregated):
-            best_order = agr.orderBestPrice * 100
+            best_order = agr.order_best_price_cents
             points_count = math.ceil(len(skin.sales) / 100 * self.good_points_percent)
             count = 0
             for i in skin.sales:
-                price_with_fee = sale_price_amount(i.price) * (1 - SELL_FEE / 100)
+                price_with_fee = i.price_cents * (1 - SELL_FEE / 100)
                 if price_with_fee > best_order * (1 + self.profit_percent / 100):
                     count += 1
             if count >= points_count:
@@ -131,13 +118,13 @@ class OrderAnalytics:
         aggregated = await self.bot.aggregated_prices(names)
         aggregated = sorted(aggregated, key=lambda x: x.title)
         for skin, agr in zip(skins, aggregated):
-            best_order = agr.orderBestPrice * 100
+            best_order = agr.order_best_price_cents
             my_sell_price = best_order * (1 + self.profit_percent / 100)
 
             count = 0
             points_count = math.ceil(len(skin.sales) / 100 * self.good_points_percent)
             for i in skin.sales:
-                price_with_fee = sale_price_amount(i.price) * (1 - SELL_FEE / 100)
+                price_with_fee = i.price_cents * (1 - SELL_FEE / 100)
                 if price_with_fee > my_sell_price:
                     count += 1
             if count >= points_count:
@@ -149,6 +136,7 @@ class OrderAnalytics:
 
     @staticmethod
     def first_second_offer(info: list[CumulativePrice]) -> tuple:
+        """Returns (best_price_cents, second_price_cents, level_count)."""
         len_offers = len(info)
         if len_offers == 0:
             best_offer_price = 0
@@ -162,22 +150,24 @@ class OrderAnalytics:
                     second_offer = info[1]
                 else:
                     second_offer = best_offer
-            best_offer_price = best_offer.Price
-            second_offer_price = second_offer.Price
+            best_offer_price = best_offer.price_cents
+            second_offer_price = second_offer.price_cents
         return best_offer_price, second_offer_price, len_offers
 
     async def analyze_market_offers(self, skin: SkinHistory):
         market_info = await self.bot.cumulative_price(skin.title, skin.game)
-        len_avg = skin.sales[0 : self.avg_price_count]
-        avg_price_10 = sum(float(s.price) for s in len_avg) / len(len_avg)
+        recent_sales = skin.sales[0 : self.avg_price_count]
+        avg_price = sum(s.price_cents for s in recent_sales) / len(recent_sales)
         best_offer, second_offer, offers_count = self.first_second_offer(market_info.Offers)
         best_target, second_target, targets_count = self.first_second_offer(market_info.Targets)
         if best_offer == 0 or (best_target - second_target) / best_offer * 100 > 3:
             best_target = second_target
         if second_offer == 0 or (second_offer - best_offer) / second_offer * 100 > 3:
             best_offer = second_offer
+        if best_target == 0:
+            return best_offer, best_target, offers_count, targets_count, 0.0, 0.0
         profit = -(best_target - (1 - SELL_FEE / 100) * best_offer) / best_target * 100
-        profit_by_avg = -(best_target - (1 - SELL_FEE / 100) * avg_price_10) / best_target * 100
+        profit_by_avg = -(best_target - (1 - SELL_FEE / 100) * avg_price) / best_target * 100
         return best_offer, best_target, offers_count, targets_count, profit, round(profit_by_avg, 2)
 
     async def frequency2(self, skins: list[SkinHistory]) -> list[SkinOrder]:
@@ -194,19 +184,17 @@ class OrderAnalytics:
             ) = await self.analyze_market_offers(skin)
 
             if profit_2 > self.profit_percent and profit > self.profit_percent:
-                my_sell_price = best_target * 100 * (1 + self.profit_percent / 100)
+                my_sell_price = best_target * (1 + self.profit_percent / 100)
                 count = 0
                 points_count = math.ceil(len(skin.sales) / 100 * self.good_points_percent)
                 for i in skin.sales:
-                    price_with_fee = sale_price_amount(i.price) * (1 - SELL_FEE / 100)
+                    price_with_fee = i.price_cents * (1 - SELL_FEE / 100)
                     if price_with_fee > my_sell_price:
                         count += 1
                 if count >= points_count:
                     if offers_count <= self.max_count_offers:
                         items.append(
-                            SkinOrder(
-                                title=skin.title, bestOrder=int(best_target * 100), game=skin.game
-                            )
+                            SkinOrder(title=skin.title, bestOrder=int(best_target), game=skin.game)
                         )
         return items
 
@@ -268,7 +256,7 @@ class Orders:
         offer = await self.bot.market_offers(name=item.title, limit=1, game=item.game)
         if offer.objects and offer.objects[0].title == item.title:
             offer = offer.objects[0]
-            price = LastPrice(Currency="USD", Amount=item.bestOrder / 100)
+            price = LastPrice.from_cents(item.bestOrder)
             attributes = [
                 TargetAttributes(Name="name", Value=offer.extra.name),
                 TargetAttributes(Name="title", Value=offer.title),
@@ -287,8 +275,7 @@ class Orders:
 
     async def check_offers(self, item: SkinOrder):
         offers = await self.bot.offers_by_title(name=item.title, limit=3)
-        offers = sorted(offers.objects, key=lambda x: int(x.price.USD))
-        offer_prices = [o.price.USD for o in offers]
+        offer_prices = sorted(o.price.usd_cents for o in offers.objects)
         my_sell_price = item.bestOrder * (1 + self.order_list.profit_percent / 100)
         return any(my_sell_price <= p for p in offer_prices)
 
@@ -319,7 +306,7 @@ class Orders:
             for i in good:
                 for j in skins:
                     if i.Title == j.title:
-                        if i.Price.Amount * 100 != j.bestOrder:
+                        if i.Price.amount_cents != j.bestOrder:
                             order_price = self.order_price(j.maxPrice, j.minPrice, j.bestOrder)
                             j.bestOrder = order_price
                             if await self.check_offers(j):

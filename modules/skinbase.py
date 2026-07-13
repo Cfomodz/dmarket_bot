@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import re
 from itertools import groupby
@@ -11,17 +12,9 @@ from config import BAD_ITEMS, GAMES, BuyParams, PrevParams, Timers, logger
 from db.crud import SelectSkin
 
 
-def sale_price_amount(price: str) -> float:
-    value = re.sub(r"[^\d.,-]", "", price or "").replace(",", ".")
-    if not value:
-        return 0.0
-    amount = float(value)
-    if "." in value:
-        return amount * 100
-    return amount
-
-
 class SkinBase:
+    MAX_CONCURRENT_REQUESTS = 5
+
     def __init__(self, api: DMarketApi):
         self.api = api
         self.repeat = Timers.PREV_BASE
@@ -56,41 +49,48 @@ class SkinBase:
         skins = [list(group)[0] for _, group in groupby(market_offers.objects, lambda x: x.title)]
         return [s for s in skins if self.check_name(s.title)]
 
+    async def _fetch_one(
+        self, sem: asyncio.Semaphore, item: MarketOffer | SkinHistory, min_p: float, max_p: float
+    ) -> SkinHistory | None:
+        if isinstance(item, MarketOffer):
+            game = Games(item.gameId)
+        else:
+            game = Games(item.game)
+        try:
+            async with sem:
+                history = await self.api.last_sales(item.title, game=game)
+            if len(history.sales) == 20:
+                prices = [s.price_cents for s in history.sales]
+                avg_price = sum(prices) / len(prices)
+                if min_p <= avg_price <= max_p:
+                    return SkinHistory(
+                        title=item.title,
+                        game=game.value,
+                        sales=history.sales,
+                        avg_price=avg_price,
+                        update_time=datetime.datetime.now(),
+                    )
+        except ValidationError as e:
+            logger.error(e.json())
+        except Exception as e:
+            logger.error(f"Exception in skinbase: {e}")
+        return None
+
     async def filter_skins(
         self, skins: list[MarketOffer | SkinHistory], min_p: int, max_p: int
     ) -> list[SkinHistory]:
         min_p = min_p * 0.9
         max_p = max_p * 1.1
-        s = list()
-        count = 0
-        for i in skins:
-            if isinstance(i, MarketOffer):
-                game = Games(i.gameId)
-            else:
-                game = Games(i.game)
-            try:
-                history = await self.api.last_sales(i.title, game=game)
-                if len(history.sales) == 20:
-                    prices = [sale_price_amount(i.price) for i in history.sales]
-                    avg_price = sum(prices) / len(prices)
-                    if min_p <= avg_price <= max_p:
-                        try:
-                            sk = SkinHistory(
-                                title=i.title,
-                                game=game.value,
-                                sales=history.sales,
-                                avg_price=avg_price,
-                                update_time=datetime.datetime.now(),
-                            )
-                            s.append(sk)
-                        except ValidationError as e:
-                            logger.error(e.json())
-            except Exception as e:
-                logger.error(f"Exception in skinbase: {e}")
-            if count % 500 == 0:
-                logger.debug(f"Game: {game}. Parsed {count} skins/items.")
-            count += 1
-        return s
+        sem = asyncio.Semaphore(self.MAX_CONCURRENT_REQUESTS)
+        results = []
+        # Process in chunks so progress is visible and a crash loses little work
+        chunk_size = 500
+        for start in range(0, len(skins), chunk_size):
+            chunk = skins[start : start + chunk_size]
+            fetched = await asyncio.gather(*(self._fetch_one(sem, i, min_p, max_p) for i in chunk))
+            results += [s for s in fetched if s]
+            logger.debug(f"Parsed {min(start + chunk_size, len(skins))}/{len(skins)} skins/items.")
+        return results
 
     async def update_base(self):
         final_skins = list()

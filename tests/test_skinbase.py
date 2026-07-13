@@ -1,6 +1,5 @@
 """Tests for SkinBase item filtering and database management."""
 
-
 from config import BAD_ITEMS
 from modules.skinbase import SkinBase
 

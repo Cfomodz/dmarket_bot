@@ -17,6 +17,10 @@ if not PUBLIC_KEY or not SECRET_KEY:
         "DMARKET_PUBLIC_KEY and DMARKET_SECRET_KEY."
     )
 
+# When true, every mutating API call (creating/deleting targets and offers) is
+# logged instead of sent, so the full pipeline can run live without spending money.
+DRY_RUN = getenv("DRY_RUN", "false").strip().lower() in ("1", "true", "yes")
+
 logger_config = {
     "handlers": [
         {"sink": sys.stderr, "colorize": True, "level": "INFO"},
