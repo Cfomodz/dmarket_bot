@@ -1,4 +1,3 @@
-
 from api.dmarketapi import DMarketApi
 from api.schemas import (
     CreateOffer,
@@ -35,7 +34,7 @@ class History:
                 OfferID=i.OfferID,
                 TargetID=i.TargetID,
                 AssetID=i.AssetID,
-                buyPrice=float(i.Price.Amount),
+                buyPrice=i.Price.amount_cents,
                 Amount=i.Amount,
             )
             for i in buy
@@ -48,7 +47,7 @@ class History:
             SellOffer(
                 AssetID=i.AssetID,
                 OfferID=i.OfferID,
-                sellPrice=i.Price.Amount,
+                sellPrice=i.Price.amount_cents,
                 sellTime=i.OfferClosedAt,
                 title=i.Title,
                 game="rust",
@@ -97,37 +96,31 @@ class Offers:
         create_offers = []
         for i in invent:
             for j in skins:
-                if i.AssetID == j.AssetID:
-                    price = j.buyPrice * (1 + self.max_percent / 100 + i.fee / 100)
-                    i.sellPrice = price
-            if i.sellPrice is None or i.sellPrice < 0.05:
+                if i.AssetID == j.AssetID and j.buyPrice is not None:
+                    i.sellPrice = j.buyPrice * (1 + self.max_percent / 100 + i.fee / 100)
+            if i.sellPrice is None or i.sellPrice < 5:  # never list below 5 cents
                 continue
-            try:
-                create_offers.append(
-                    CreateOffer(
-                        AssetID=i.AssetID,
-                        Price=LastPrice(Currency="USD", Amount=round(i.sellPrice, 2)),
-                    )
-                )
-            except TypeError:
-                pass
+            create_offers.append(
+                CreateOffer(AssetID=i.AssetID, Price=LastPrice.from_cents(i.sellPrice))
+            )
 
         add = await self.bot.user_offers_create(CreateOffers(Offers=create_offers))
         if add.Result:
             for i in add.Result:
                 for j in invent:
                     if i.CreateOffer.AssetID == j.AssetID:
-                        j.sellPrice = i.CreateOffer.Price.Amount
+                        j.sellPrice = i.CreateOffer.Price.amount_cents
                         j.OfferID = i.OfferID
                         SelectSkinOffer.update_offer_id(j)
         logger.debug(f"Add to sell: {add}")
 
     @staticmethod
     def offer_price(max_p, min_p, best) -> float:
+        """All arguments and the result are cents; undercut the best offer by one cent."""
         if best < min_p:
             return min_p
         elif min_p < best <= max_p:
-            return best - 0.01
+            return best - 1
         else:
             return max_p
 
@@ -145,22 +138,21 @@ class Offers:
 
         items_to_update = list()
         for i in on_sale:
-            if not i.title or i.title not in agr_by_title:
+            if not i.title or i.title not in agr_by_title or i.buyPrice is None:
                 continue
-            best_price = agr_by_title[i.title].offerBestPrice
-            if i.sellPrice != best_price:
-                max_sell_price = i.buyPrice * (1 + self.max_percent / 100 + i.fee / 100)
-                min_sell_price = i.buyPrice * (1 + self.min_percent / 100 + i.fee / 100)
-                price = self.offer_price(max_sell_price, min_sell_price, best_price)
-                if round(price, 2) != round(i.sellPrice, 2):
-                    i.sellPrice = price
-                    items_to_update.append(
-                        EditOffer(
-                            OfferID=i.OfferID,
-                            AssetID=i.AssetID,
-                            Price=LastPrice(Currency="USD", Amount=round(i.sellPrice, 2)),
-                        )
+            best_price = agr_by_title[i.title].offer_best_price_cents
+            max_sell_price = i.buyPrice * (1 + self.max_percent / 100 + i.fee / 100)
+            min_sell_price = i.buyPrice * (1 + self.min_percent / 100 + i.fee / 100)
+            price = self.offer_price(max_sell_price, min_sell_price, best_price)
+            if i.sellPrice is None or round(price) != round(i.sellPrice):
+                i.sellPrice = price
+                items_to_update.append(
+                    EditOffer(
+                        OfferID=i.OfferID,
+                        AssetID=i.AssetID,
+                        Price=LastPrice.from_cents(i.sellPrice),
                     )
+                )
 
         if not items_to_update:
             return
@@ -168,7 +160,7 @@ class Offers:
         for i in updated.Result:
             for j in on_sale:
                 if i.EditOffer.AssetID == j.AssetID:
-                    j.sellPrice = i.EditOffer.Price.Amount
+                    j.sellPrice = i.EditOffer.Price.amount_cents
                     j.OfferID = i.NewOfferID
                     SelectSkinOffer.update_offer_id(j)
         logger.debug(f"UPDATE OFFERS: {updated}")

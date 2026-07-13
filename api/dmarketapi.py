@@ -41,10 +41,15 @@ from config import API_URL, logger
 
 
 class DMarketApi:
-    def __init__(self, public_key: str, secret_key: str):
+    MAX_RETRIES = 3
+    RETRY_BACKOFF = 2  # seconds, doubled on each retry
+    MAX_RATE_LIMIT_SLEEP = 60  # seconds
+
+    def __init__(self, public_key: str, secret_key: str, dry_run: bool = False):
         self.PUBLIC_KEY = public_key
         self.SECRET_KEY = secret_key
         self.balance = 0
+        self.dry_run = dry_run
         self.session = aiohttp.ClientSession()
 
     async def close(self):
@@ -85,19 +90,28 @@ class DMarketApi:
         if response_status != 200 and "application/json" not in headers.get("content-type", ""):
             raise WrongResponseException(response_text)
 
+    async def _rate_limit_sleep(self, headers: Mapping[str, str]) -> None:
+        if headers.get("RateLimit-Remaining") not in ("1", "0"):
+            return
+        try:
+            reset = int(headers.get("RateLimit-Reset", "5"))
+        except ValueError:
+            reset = 5
+        # Some responses carry an epoch timestamp instead of a delta
+        if reset > self.MAX_RATE_LIMIT_SLEEP:
+            reset = reset - int(datetime.now().timestamp())
+        await asyncio.sleep(min(max(reset, 1), self.MAX_RATE_LIMIT_SLEEP))
+
     async def validate_response(self, response: aiohttp.ClientResponse) -> dict:
         headers = response.headers
-        if "RateLimit-Remaining" not in headers:
-            await asyncio.sleep(5)
-        if "RateLimit-Remaining" in headers and headers["RateLimit-Remaining"] in ["1", "0"]:
-            await asyncio.sleep(int(headers["RateLimit-Reset"]))
         response_status = response.status
         response_text = await response.text()
         self.catch_exception(response_status, headers, response_text)
         body = await response.json()
+        await self._rate_limit_sleep(headers)
         return body
 
-    async def api_call(
+    async def _request(
         self, url: str, method: str, headers: dict, params: dict = None, body: dict = None
     ) -> dict:
         if method == "GET":
@@ -113,6 +127,23 @@ class DMarketApi:
                 url, params=params, json=body, headers=headers
             ) as response:
                 return await self.validate_response(response)
+
+    async def api_call(
+        self, url: str, method: str, headers: dict, params: dict = None, body: dict = None
+    ) -> dict:
+        delay = self.RETRY_BACKOFF
+        for attempt in range(self.MAX_RETRIES + 1):
+            try:
+                return await self._request(url, method, headers, params, body)
+            except (TooManyRequests, BadGatewayError):
+                if attempt == self.MAX_RETRIES:
+                    raise
+                logger.warning(
+                    f"Retrying {method} {url} in {delay}s "
+                    f"(attempt {attempt + 1}/{self.MAX_RETRIES})"
+                )
+                await asyncio.sleep(delay)
+                delay *= 2
 
     # ACCOUNT
     # ----------------------------------------------------------------
@@ -270,6 +301,9 @@ class DMarketApi:
         return ClosedTargets(**response)
 
     async def create_target(self, body: CreateTargets):
+        if self.dry_run:
+            logger.info(f"[DRY RUN] create_target: {body.model_dump()}")
+            return {"Result": []}
         method = "POST"
         url_path = "/marketplace-api/v1/user-targets/create"
         headers = self.generate_headers(method, url_path, body=body.model_dump())
@@ -278,6 +312,9 @@ class DMarketApi:
         return response
 
     async def delete_target(self, targets: list[Target]):
+        if self.dry_run:
+            logger.info(f"[DRY RUN] delete_target: {[t.TargetID for t in targets]}")
+            return []
         method = "POST"
         url_path = "/marketplace-api/v1/user-targets/delete"
         all_results = []
@@ -351,6 +388,9 @@ class DMarketApi:
         return ClosedOffers(**response)
 
     async def user_offers_create(self, body: CreateOffers):
+        if self.dry_run:
+            logger.info(f"[DRY RUN] user_offers_create: {body.model_dump()}")
+            return CreateOffersResponse(Result=[])
         method = "POST"
         url_path = "/marketplace-api/v1/user-offers/create"
         body = body.model_dump()
@@ -360,6 +400,9 @@ class DMarketApi:
         return CreateOffersResponse(**response)
 
     async def user_offers_edit(self, body: EditOffers):
+        if self.dry_run:
+            logger.info(f"[DRY RUN] user_offers_edit: {body.model_dump()}")
+            return EditOffersResponse(Result=[])
         method = "POST"
         url_path = "/marketplace-api/v1/user-offers/edit"
         body = body.model_dump()
@@ -369,6 +412,9 @@ class DMarketApi:
         return EditOffersResponse(**response)
 
     async def user_offers_delete(self, body: DeleteOffers):
+        if self.dry_run:
+            logger.info(f"[DRY RUN] user_offers_delete: {body.model_dump()}")
+            return {}
         method = "DELETE"
         url_path = "/exchange/v1/offers"
         body = body.model_dump()

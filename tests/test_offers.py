@@ -11,22 +11,23 @@ from modules.offers import History, Offers
 
 
 class TestOfferPrice:
+    # All values are cents; the bot undercuts the best competing offer by one cent.
     def test_below_min(self):
-        assert Offers.offer_price(2.0, 1.0, 0.5) == 1.0
+        assert Offers.offer_price(200, 100, 50) == 100
 
     def test_in_range(self):
-        assert Offers.offer_price(2.0, 1.0, 1.5) == 1.49
+        assert Offers.offer_price(200, 100, 150) == 149
 
     def test_above_max(self):
-        assert Offers.offer_price(2.0, 1.0, 3.0) == 2.0
+        assert Offers.offer_price(200, 100, 300) == 200
 
     def test_at_min(self):
         # When best == min_p, condition `min_p < best` is False -> falls to else -> max_p
-        assert Offers.offer_price(2.0, 1.0, 1.0) == 2.0
+        assert Offers.offer_price(200, 100, 100) == 200
 
     def test_at_max(self):
         # best == max_p falls into elif (min_p < best <= max_p)
-        assert Offers.offer_price(2.0, 1.0, 2.0) == 1.99
+        assert Offers.offer_price(200, 100, 200) == 199
 
 
 class TestOffers:

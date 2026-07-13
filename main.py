@@ -1,7 +1,7 @@
 import asyncio
 
 from api.dmarketapi import DMarketApi
-from config import PUBLIC_KEY, SECRET_KEY, BuyParams, Timers, logger
+from config import DRY_RUN, PUBLIC_KEY, SECRET_KEY, BuyParams, Timers, logger
 from modules.offers import History, Offers
 from modules.orders import Orders
 from modules.skinbase import SkinBase
@@ -89,7 +89,7 @@ async def delete_offers_loop():
 async def main_loop():
     global bot, skin_base, orders, history, offers
 
-    bot = DMarketApi(PUBLIC_KEY, SECRET_KEY)
+    bot = DMarketApi(PUBLIC_KEY, SECRET_KEY, dry_run=DRY_RUN)
     skin_base = SkinBase(bot)
     orders = Orders(bot)
     history = History(bot)
@@ -98,11 +98,11 @@ async def main_loop():
     try:
         return await asyncio.gather(
             bot.get_money_loop(),
-            # delete_offers_loop(),
-            # history_loop(),
+            delete_offers_loop(),
+            history_loop(),
             orders_loop(),
-            # add_to_sell_loop(),
-            # update_offers_loop(),
+            add_to_sell_loop(),
+            update_offers_loop(),
             create_pre_base(),
             return_exceptions=True,
         )
@@ -112,7 +112,8 @@ async def main_loop():
 
 def main():
     try:
-        logger.info("The bot is launching")
+        mode = "DRY RUN (no orders/offers will be placed)" if DRY_RUN else "LIVE"
+        logger.info(f"The bot is launching in {mode} mode")
         asyncio.run(main_loop())
     except KeyboardInterrupt:
         logger.info("The bot is shutting down")

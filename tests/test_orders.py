@@ -47,10 +47,11 @@ class TestOrderAnalytics:
         assert count == 0
 
     def test_first_second_offer_single(self):
+        # Wire prices are dollars; first_second_offer returns cents
         offers = [CumulativePrice(Price=1.5, Level=1, Amount=3)]
         best, second, count = OrderAnalytics.first_second_offer(offers)
-        assert best == 1.5
-        assert second == 1.5
+        assert best == 150
+        assert second == 150
         assert count == 1
 
     def test_first_second_offer_single_amount(self):
@@ -59,8 +60,8 @@ class TestOrderAnalytics:
             CumulativePrice(Price=1.6, Level=2, Amount=5),
         ]
         best, second, count = OrderAnalytics.first_second_offer(offers)
-        assert best == 1.5
-        assert second == 1.6  # Amount=1 so second is next level
+        assert best == 150
+        assert second == 160  # Amount=1 so second is next level
         assert count == 2
 
     def test_first_second_offer_multiple_amount(self):
@@ -69,8 +70,8 @@ class TestOrderAnalytics:
             CumulativePrice(Price=1.6, Level=2, Amount=5),
         ]
         best, second, count = OrderAnalytics.first_second_offer(offers)
-        assert best == 1.5
-        assert second == 1.5  # Amount>1 so second=best
+        assert best == 150
+        assert second == 150  # Amount>1 so second=best
         assert count == 2
 
 
